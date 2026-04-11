@@ -109,47 +109,25 @@ Documents are validated against your Zod schema on writes and full-document read
 
 ## API Overview
 
-Core operations:
+### Done
 
-- create
-- insertOne
-- insertMany
-- findOne
-- find
-- findById
-- updateOne
-- updateMany
-- findByIdAndUpdate
-- deleteOne
-- deleteMany
-- findByIdAndDelete
-- replaceOne
-- countDocuments
-- exists
-- distinct
-- aggregate
+- [x] Core CRUD: create, insertOne, insertMany, findOne, find, findById
+- [x] Updates: updateOne, updateMany, findByIdAndUpdate, replaceOne
+- [x] Deletes: deleteOne, deleteMany, findByIdAndDelete
+- [x] Aggregation helpers: countDocuments, exists, distinct, aggregate
+- [x] Fluent API: findFluent, findOneFluent, findByIdFluent, where, exec, execOne, execMany, first
+- [x] Plugin hooks: use
+- [x] Middleware hooks: pre, post
+- [x] Soft-delete lifecycle: enableSoftDelete, restoreOne, hardDeleteOne, hardDeleteMany
+- [x] Pagination helper: paginate
+- [x] Populate support via refs mapping
 
-Fluent query API:
+### Todo
 
-- findFluent
-- findOneFluent
-- findByIdFluent
-- where
-- exec
-- execOne
-- execMany
-- first
-
-Plugin and lifecycle APIs:
-
-- use
-- pre
-- post
-- enableSoftDelete
-- paginate
-- restoreOne
-- hardDeleteOne
-- hardDeleteMany
+- [ ] Richer index definitions (compound, unique, sparse, TTL, partial)
+- [ ] More fluent operators (regex, exists, size, text)
+- [ ] Transactions and sessions helpers
+- [ ] Better projection output typing for fluent select
 
 ## Usage Examples
 

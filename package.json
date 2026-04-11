@@ -1,6 +1,6 @@
 {
   "name": "omymongo",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "TypeScript-first MongoDB toolkit with Zod validation and fluent model APIs.",
   "homepage": "https://github.com/quenginedev/omymongo#readme",
   "bugs": {
@@ -25,8 +25,19 @@
     "dist"
   ],
   "type": "module",
+  "main": "./dist/index.mjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
   "exports": {
-    ".": "./dist/index.mjs",
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "default": "./dist/index.mjs"
+    },
     "./package.json": "./package.json"
   },
   "publishConfig": {
