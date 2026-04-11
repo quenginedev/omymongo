@@ -324,6 +324,8 @@ pnpm build
 
 ## Project Direction
 
+Detailed milestone board: see [ROADMAP.md](./ROADMAP.md).
+
 Planned improvements include:
 
 - Richer index definitions (compound, unique, TTL, partial)
