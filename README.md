@@ -245,8 +245,8 @@ const Books = model({
 	options: {
 		refs: {
 			authorId: {
-				field: "authors",
-				single: true,
+        field: "author",
+				collection: "authors",
 			},
 		},
 	},
