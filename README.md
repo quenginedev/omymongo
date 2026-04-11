@@ -330,5 +330,7 @@ Planned improvements include:
 - More fluent operators (regex, exists, size, text)
 - Transactions and sessions helpers
 - Better projection output typing for fluent selects
+- Realtime pub/sub to stream document changes over WebSocket or third-party brokers
+- Automatic document migration for drifted records when schema evolves
 
 Contributions and feedback are welcome.
