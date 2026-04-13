@@ -1,6 +1,6 @@
 {
   "name": "omymongo",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "TypeScript-first MongoDB toolkit with Zod validation and fluent model APIs.",
   "homepage": "https://github.com/quenginedev/omymongo#readme",
   "bugs": {
