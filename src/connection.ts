@@ -13,20 +13,22 @@ export class ConnectionError extends OmyMongoError {
 export class Connection {
   static instance: Connection;
   static getInstance(options?: ConnectionOptionsType) {
-    if(!Connection.instance && !options) {
-      throw new ConnectionError("Connection instance not initialized. Please provide connection options.");
+    if (!Connection.instance && !options) {
+      throw new ConnectionError(
+        "Connection instance not initialized. Please provide connection options.",
+      );
     }
 
     if (!Connection.instance && options) {
       Connection.instance = new Connection(options);
     }
-    
+
     return Connection.instance;
   }
 
-  private client: MongoClient | null = null;
+  client: MongoClient | null = null;
 
-  private options: ConnectionOptionsType;
+  options: ConnectionOptionsType;
 
   connection_counter = 0;
 

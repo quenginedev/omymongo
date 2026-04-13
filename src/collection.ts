@@ -1,4 +1,4 @@
-import type { Document as MongoDocument, OptionalUnlessRequiredId } from "mongodb";
+import type { Document as MongoDocument, IndexDescription, OptionalUnlessRequiredId } from "mongodb";
 import type z from "zod";
 import { Connection } from "./connection.ts";
 import { OmyMongoError, ValidationError } from "./errors.ts";
@@ -62,13 +62,30 @@ type ReferenceMap<Type> = {
   [Key in keyof Type]?: Reference;
 };
 
-type IndexMap<Type> = Partial<Record<keyof Type, 1 | -1>>;
+export type IndexDirection = 1 | -1;
+
+export type IndexKeys<Type> = Partial<
+  Record<keyof Type | keyof Pick<Document<Type>, "_id" | "createdAt" | "updatedAt">, IndexDirection>
+>;
+
+export type RichIndexDefinition<Type> = {
+  keys: IndexKeys<Type>;
+  name?: string;
+  unique?: boolean;
+  sparse?: boolean;
+  expireAfterSeconds?: number;
+  partialFilterExpression?: Filter<Type>;
+};
+
+export type IndexMap<Type> = Partial<Record<keyof Type, IndexDirection>>;
+
+export type CollectionIndexes<Type> = IndexMap<Type> | RichIndexDefinition<Type>[];
 
 export class Collection<Type> {
   private schema: z.ZodType<Type>;
   private connection: Connection;
   private refs: ReferenceMap<Type>;
-  private indexes: IndexMap<Type>;
+  private indexes?: CollectionIndexes<Type>;
   private logger = Logger;
   private indexesEnsured = false;
   private preHooks: Map<CollectionOperation, HookHandler<Type>[]> = new Map();
@@ -83,7 +100,7 @@ export class Collection<Type> {
   ) {
     this.connection = options.connection ?? Connection.getInstance();
     this.refs = options.refs ?? {};
-    this.indexes = options.indexes ?? {};
+    this.indexes = options.indexes;
 
     if (schema instanceof SchemaDefinition) {
       this.schemaDefinition = schema;
@@ -173,18 +190,75 @@ export class Collection<Type> {
     };
   }
 
+  private normalizeIndexes(): RichIndexDefinition<Type>[] {
+    if (!this.indexes) return [];
+
+    if (Array.isArray(this.indexes)) {
+      return this.indexes;
+    }
+
+    return Object.entries(this.indexes).map(([field, direction]) => ({
+      keys: { [field]: direction as IndexDirection } as IndexKeys<Type>,
+    }));
+  }
+
+  private buildIndexModels(definitions: RichIndexDefinition<Type>[]): IndexDescription[] {
+    return definitions.map((definition) => {
+      const model: IndexDescription = {
+        key: Object.fromEntries(
+          Object.entries(definition.keys).filter(([, direction]) => direction !== undefined),
+        ) as Record<string, IndexDirection>,
+      };
+
+      if (definition.name !== undefined) {
+        model.name = definition.name;
+      }
+
+      if (definition.unique !== undefined) {
+        model.unique = definition.unique;
+      }
+
+      if (definition.sparse !== undefined) {
+        model.sparse = definition.sparse;
+      }
+
+      if (definition.expireAfterSeconds !== undefined) {
+        model.expireAfterSeconds = definition.expireAfterSeconds;
+      }
+
+      if (definition.partialFilterExpression !== undefined) {
+        model.partialFilterExpression = definition.partialFilterExpression;
+      }
+
+      return model;
+    });
+  }
+
   private async ensureIndexes() {
     // References are configured for upcoming populate support.
     void this.refs;
 
     if (!this.indexes || this.indexesEnsured) return;
 
+    const definitions = this.normalizeIndexes();
+    if (definitions.length === 0) {
+      this.indexesEnsured = true;
+      return;
+    }
+
+    for (const definition of definitions) {
+      if (Object.keys(definition.keys).length === 0) {
+        throw new CollectionError(`Index definition for ${this.name} must declare at least one key`);
+      }
+    }
+
+    const indexModels = this.buildIndexModels(definitions);
+
     await this.connection.withLifetime(async (client) => {
       const db = client.db();
       const collection = db.collection(this.name);
-      for (const [field, order] of Object.entries(this.indexes!)) {
-        await collection.createIndex({ [field]: order as 1 | -1 });
-      }
+
+      await collection.createIndexes(indexModels);
     });
 
     this.indexesEnsured = true;
@@ -857,7 +931,7 @@ export class Collection<Type> {
 type CollectionOptions<Type> = {
   connection?: Connection;
   refs?: ReferenceMap<Type>;
-  indexes?: IndexMap<Type>;
+  indexes?: CollectionIndexes<Type>;
 };
 
 export const createCollection = <Type extends unknown>(options: {

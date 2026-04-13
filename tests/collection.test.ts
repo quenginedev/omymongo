@@ -4,7 +4,7 @@ import { createCollection, createConnection } from "../src/index";
 import z from "zod";
 import { Logger } from "../src/logger";
 
-createConnection({
+const connection = createConnection({
   uri: "mongodb://localhost:27017/testdb",
   appName: "TestApp",
   maxPoolSize: 10,
@@ -19,6 +19,50 @@ const TestCollection = createCollection({
   name: "test_collection",
   schema: TestSchema,
 });
+
+const IndexedSchema = z.object({
+  email: z.string().optional(),
+  orgId: z.string(),
+  status: z.enum(["active", "archived"]).optional(),
+  nickname: z.string().optional(),
+  expiresAt: z.date().optional(),
+});
+
+const IndexedCollection = createCollection({
+  name: "indexed_test_collection",
+  schema: IndexedSchema,
+  options: {
+    indexes: [
+      {
+        keys: { orgId: 1, createdAt: -1 },
+        name: "org_createdAt_compound",
+      },
+      {
+        keys: { nickname: 1 },
+        name: "nickname_sparse",
+        sparse: true,
+      },
+      {
+        keys: { expiresAt: 1 },
+        name: "expires_at_ttl",
+        expireAfterSeconds: 0,
+      },
+      {
+        keys: { email: 1 },
+        name: "active_email_unique",
+        unique: true,
+        partialFilterExpression: {
+          status: "active",
+        },
+      },
+    ],
+  },
+});
+
+const listIndexes = async (name: string) =>
+  connection.withLifetime(async (client) =>
+    client.db().collection(name).listIndexes().toArray(),
+  );
 
 
 describe("should test collection functionality", () => {
@@ -189,5 +233,53 @@ describe("should test collection functionality", () => {
 
     const shouldBeNull = await TestCollection.findOne({ _id: doc._id });
     expect(shouldBeNull).toBeNull();
+  });
+
+  test.sequential("should create compound, sparse, ttl and partial indexes", async () => {
+    await IndexedCollection.deleteMany({});
+    await IndexedCollection.insertOne({
+      orgId: "org-1",
+      status: "active",
+      email: "indexed@example.com",
+      nickname: "nick",
+      expiresAt: new Date(Date.now() + 60_000),
+    });
+
+    const indexes = await listIndexes("indexed_test_collection");
+
+    expect(indexes.some((index) => index.name === "org_createdAt_compound")).toBe(true);
+    expect(indexes.some((index) => index.name === "nickname_sparse" && index.sparse === true)).toBe(true);
+    expect(indexes.some((index) => index.name === "expires_at_ttl" && index.expireAfterSeconds === 0)).toBe(true);
+
+    const compoundIndex = indexes.find((index) => index.name === "org_createdAt_compound");
+    expect(compoundIndex?.key).toEqual({ orgId: 1, createdAt: -1 });
+
+    const partialIndex = indexes.find((index) => index.name === "active_email_unique");
+    expect(partialIndex?.unique).toBe(true);
+    expect(partialIndex?.partialFilterExpression).toEqual({ status: "active" });
+  });
+
+  test.sequential("should enforce partial unique indexes only for matching documents", async () => {
+    await IndexedCollection.deleteMany({});
+
+    await IndexedCollection.insertOne({
+      orgId: "org-1",
+      status: "active",
+      email: "same@example.com",
+    });
+
+    await IndexedCollection.insertOne({
+      orgId: "org-2",
+      status: "archived",
+      email: "same@example.com",
+    });
+
+    await expect(
+      IndexedCollection.insertOne({
+        orgId: "org-3",
+        status: "active",
+        email: "same@example.com",
+      }),
+    ).rejects.toThrow();
   });
 });

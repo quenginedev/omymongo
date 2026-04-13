@@ -121,10 +121,10 @@ Documents are validated against your Zod schema on writes and full-document read
 - [x] Soft-delete lifecycle: enableSoftDelete, restoreOne, hardDeleteOne, hardDeleteMany
 - [x] Pagination helper: paginate
 - [x] Populate support via refs mapping
+- [x] Rich index definitions: compound, unique, sparse, TTL, partial
 
 ### Todo
 
-- [ ] Richer index definitions (compound, unique, sparse, TTL, partial)
 - [ ] More fluent operators (regex, exists, size, text)
 - [ ] Transactions and sessions helpers
 - [ ] Better projection output typing for fluent select
@@ -164,6 +164,58 @@ const oneUser = await Users.findOne(
 	{ email: "ernest@example.com" },
 	{ projection: { name: 1, email: 1 }, populate: "teamId" },
 );
+```
+
+### Indexes
+
+Simple single-field indexes still work:
+
+```ts
+const Users = model({
+	name: "users",
+	schema: UserSchema,
+	options: {
+		indexes: {
+			email: 1,
+		},
+	},
+});
+```
+
+For compound or option-rich indexes, pass an array of definitions:
+
+```ts
+const Sessions = model({
+	name: "sessions",
+	schema: defineSchema(z.object({
+		userId: z.string(),
+		email: z.string().optional(),
+		status: z.enum(["active", "archived"]).optional(),
+		nickname: z.string().optional(),
+		expiresAt: z.date().optional(),
+	})),
+	options: {
+		indexes: [
+			{
+				keys: { userId: 1, createdAt: -1 },
+				name: "sessions_user_createdAt",
+			},
+			{
+				keys: { nickname: 1 },
+				sparse: true,
+			},
+			{
+				keys: { expiresAt: 1 },
+				expireAfterSeconds: 0,
+			},
+			{
+				keys: { email: 1 },
+				unique: true,
+				partialFilterExpression: { status: "active" },
+			},
+		],
+	},
+});
 ```
 
 ### Updates
