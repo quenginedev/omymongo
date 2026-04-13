@@ -1,14 +1,22 @@
-import type { Document as MongoDocument, IndexDescription, OptionalUnlessRequiredId } from "mongodb";
+import type {
+  Document as MongoDocument,
+  IndexDescription,
+  OptionalUnlessRequiredId,
+} from "mongodb";
 import type z from "zod";
 import { Connection } from "./connection.ts";
 import { OmyMongoError, ValidationError } from "./errors.ts";
 import { Logger } from "./logger.ts";
-import { ObjectIdSchema, SchemaDefinition, WithDocumentBase } from "./schema.ts";
+import {
+  ObjectIdSchema,
+  SchemaDefinition,
+  WithDocumentBase,
+} from "./schema.ts";
 import type {
   AggregateQueryOptions,
   CollectionPlugin,
-  Document,
   DistinctValue,
+  Document,
   Filter,
   OptionalId,
   PaginationOptions,
@@ -65,7 +73,10 @@ type ReferenceMap<Type> = {
 export type IndexDirection = 1 | -1;
 
 export type IndexKeys<Type> = Partial<
-  Record<keyof Type | keyof Pick<Document<Type>, "_id" | "createdAt" | "updatedAt">, IndexDirection>
+  Record<
+    keyof Type | keyof Pick<Document<Type>, "_id" | "createdAt" | "updatedAt">,
+    IndexDirection
+  >
 >;
 
 export type RichIndexDefinition<Type> = {
@@ -79,7 +90,9 @@ export type RichIndexDefinition<Type> = {
 
 export type IndexMap<Type> = Partial<Record<keyof Type, IndexDirection>>;
 
-export type CollectionIndexes<Type> = IndexMap<Type> | RichIndexDefinition<Type>[];
+export type CollectionIndexes<Type> = IndexMap<Type> | RichIndexDefinition<
+  Type
+>[];
 
 export class Collection<Type> {
   private schema: z.ZodType<Type>;
@@ -125,9 +138,13 @@ export class Collection<Type> {
     return this;
   }
 
-  use<Options = void>(plugin: CollectionPlugin<Type, Options>, options?: Options): this {
+  use<Options = void>(
+    plugin: CollectionPlugin<Type, Options>,
+    options?: Options,
+  ): this {
     const context: PluginContext<Type> = {
-      enableSoftDelete: (fieldName?: string) => this.enableSoftDelete(fieldName),
+      enableSoftDelete: (fieldName?: string) =>
+        this.enableSoftDelete(fieldName),
     };
 
     plugin(this, options as Options, context);
@@ -202,11 +219,15 @@ export class Collection<Type> {
     }));
   }
 
-  private buildIndexModels(definitions: RichIndexDefinition<Type>[]): IndexDescription[] {
+  private buildIndexModels(
+    definitions: RichIndexDefinition<Type>[],
+  ): IndexDescription[] {
     return definitions.map((definition) => {
       const model: IndexDescription = {
         key: Object.fromEntries(
-          Object.entries(definition.keys).filter(([, direction]) => direction !== undefined),
+          Object.entries(definition.keys).filter(([, direction]) =>
+            direction !== undefined
+          ),
         ) as Record<string, IndexDirection>,
       };
 
@@ -248,7 +269,9 @@ export class Collection<Type> {
 
     for (const definition of definitions) {
       if (Object.keys(definition.keys).length === 0) {
-        throw new CollectionError(`Index definition for ${this.name} must declare at least one key`);
+        throw new CollectionError(
+          `Index definition for ${this.name} must declare at least one key`,
+        );
       }
     }
 
@@ -287,7 +310,9 @@ export class Collection<Type> {
     if (!response.acknowledged) {
       throw new CollectionError("Failed to insert document into collection");
     }
-    const inserted = { ...insertPayload, _id: response.insertedId } as Document<Type>;
+    const inserted = { ...insertPayload, _id: response.insertedId } as Document<
+      Type
+    >;
     await this.runHooks("post", {
       operation: "insertOne",
       collection: this.name,
@@ -347,7 +372,10 @@ export class Collection<Type> {
     return this.insertOne(document);
   }
 
-  async findOne(filter: Filter<Type>, options?: QueryOptions<Type>): Promise<Document<Type> | null> {
+  async findOne(
+    filter: Filter<Type>,
+    options?: QueryOptions<Type>,
+  ): Promise<Document<Type> | null> {
     await this.ensureIndexes();
     const scopedFilter = this.withScopedFilter(filter, options?.withDeleted);
     await this.runHooks("pre", {
@@ -365,9 +393,14 @@ export class Collection<Type> {
       });
     });
     if (!response) return null;
-    const rawResult = options?.projection ? response as Document<Type> : this.validateDocument(response);
+    const rawResult = options?.projection
+      ? response as Document<Type>
+      : this.validateDocument(response);
     if (!rawResult) return null;
-    const [result] = await this.populateDocuments([rawResult], options?.populate);
+    const [result] = await this.populateDocuments(
+      [rawResult],
+      options?.populate,
+    );
     await this.runHooks("post", {
       operation: "findOne",
       collection: this.name,
@@ -382,7 +415,10 @@ export class Collection<Type> {
     return this.findOne({ _id: parsedId } as Filter<Type>);
   }
 
-  async find(filter: Filter<Type>, options?: QueryOptions<Type>): Promise<Document<Type>[]> {
+  async find(
+    filter: Filter<Type>,
+    options?: QueryOptions<Type>,
+  ): Promise<Document<Type>[]> {
     await this.ensureIndexes();
     const scopedFilter = this.withScopedFilter(filter, options?.withDeleted);
     await this.runHooks("pre", {
@@ -458,7 +494,9 @@ export class Collection<Type> {
     return result;
   }
 
-  async findByIdAndDelete(id: Document<Type>["_id"]): Promise<Document<Type> | null> {
+  async findByIdAndDelete(
+    id: Document<Type>["_id"],
+  ): Promise<Document<Type> | null> {
     const parsedId = ObjectIdSchema.parse(id);
     return this.deleteOne({ _id: parsedId } as Filter<Type>);
   }
@@ -584,10 +622,14 @@ export class Collection<Type> {
     const response = await this.connection.withLifetime(async (client) => {
       const db = client.db();
       const collection = db.collection<Document<Type>>(this.name);
-      return await collection.findOneAndReplace(scopedFilter, nextDoc as Document<Type>, {
-        returnDocument: "after",
-        upsert: options?.upsert,
-      });
+      return await collection.findOneAndReplace(
+        scopedFilter,
+        nextDoc as Document<Type>,
+        {
+          returnDocument: "after",
+          upsert: options?.upsert,
+        },
+      );
     });
 
     if (!response) return null;
@@ -633,10 +675,14 @@ export class Collection<Type> {
       operation: "deleteMany",
       collection: this.name,
       filter: scopedFilter,
-      result: "deletedCount" in response ? response.deletedCount : response.modifiedCount,
+      result: "deletedCount" in response
+        ? response.deletedCount
+        : response.modifiedCount,
     });
 
-    return "deletedCount" in response ? response.deletedCount : response.modifiedCount;
+    return "deletedCount" in response
+      ? response.deletedCount
+      : response.modifiedCount;
   }
 
   async countDocuments(
@@ -652,7 +698,10 @@ export class Collection<Type> {
     });
   }
 
-  async exists(filter: Filter<Type>, options?: Pick<QueryOptions<Type>, "withDeleted">): Promise<boolean> {
+  async exists(
+    filter: Filter<Type>,
+    options?: Pick<QueryOptions<Type>, "withDeleted">,
+  ): Promise<boolean> {
     const count = await this.countDocuments(filter, options);
     return count > 0;
   }
@@ -689,7 +738,9 @@ export class Collection<Type> {
 
   async restoreOne(filter: Filter<Type>): Promise<Document<Type> | null> {
     if (!this.softDeleteField) {
-      throw new CollectionError("Soft delete is not enabled on this collection");
+      throw new CollectionError(
+        "Soft delete is not enabled on this collection",
+      );
     }
 
     const scopedFilter = this.withScopedFilter(filter, true);
@@ -777,7 +828,10 @@ export class Collection<Type> {
 
     if (initial.success) return initial;
 
-    if (this.softDeleteField && document && typeof document === "object" && !Array.isArray(document)) {
+    if (
+      this.softDeleteField && document && typeof document === "object" &&
+      !Array.isArray(document)
+    ) {
       const clone = { ...(document as Record<string, unknown>) };
       delete clone[this.softDeleteField];
       return fullSchema.safeParse(clone);
@@ -786,7 +840,10 @@ export class Collection<Type> {
     return initial;
   }
 
-  private withScopedFilter(filter: Filter<Type>, withDeleted = false): Filter<Type> {
+  private withScopedFilter(
+    filter: Filter<Type>,
+    withDeleted = false,
+  ): Filter<Type> {
     if (!this.softDeleteField || withDeleted) {
       return filter;
     }
@@ -804,7 +861,12 @@ export class Collection<Type> {
   private filterMentionsSoftDelete(filter: Filter<Type>): boolean {
     if (!this.softDeleteField) return false;
 
-    if (Object.prototype.hasOwnProperty.call(filter as object, this.softDeleteField)) {
+    if (
+      Object.prototype.hasOwnProperty.call(
+        filter as object,
+        this.softDeleteField,
+      )
+    ) {
       return true;
     }
 
@@ -818,7 +880,10 @@ export class Collection<Type> {
       if (!Array.isArray(group)) continue;
 
       for (const item of group) {
-        if (item && typeof item === "object" && this.filterMentionsSoftDelete(item as Filter<Type>)) {
+        if (
+          item && typeof item === "object" &&
+          this.filterMentionsSoftDelete(item as Filter<Type>)
+        ) {
           return true;
         }
       }
@@ -903,7 +968,8 @@ export class Collection<Type> {
           continue;
         }
 
-        (doc as Record<string, unknown>)[fieldName] = map.get(String(current)) ?? null;
+        (doc as Record<string, unknown>)[fieldName] =
+          map.get(String(current)) ?? null;
       }
     }
 
@@ -1075,7 +1141,9 @@ export class CollectionQuery<Type> {
 
   private assertCurrentField() {
     if (!this.currentField) {
-      throw new CollectionError("No field selected. Call where(field) before applying a field operator.");
+      throw new CollectionError(
+        "No field selected. Call where(field) before applying a field operator.",
+      );
     }
   }
 
