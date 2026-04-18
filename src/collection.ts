@@ -1073,6 +1073,68 @@ export class CollectionQuery<Type> {
     return this;
   }
 
+  regex(pattern: string | RegExp, options?: string) {
+    this.assertCurrentField();
+
+    const resolvedPattern = pattern instanceof RegExp
+      ? pattern.source
+      : pattern;
+    const resolvedOptions = options ??
+      (pattern instanceof RegExp ? pattern.flags : undefined);
+
+    this.mergeFieldOperator(this.currentField!, "$regex", resolvedPattern);
+
+    if (resolvedOptions && resolvedOptions.length > 0) {
+      this.mergeFieldOperator(this.currentField!, "$options", resolvedOptions);
+    }
+
+    return this;
+  }
+
+  exists(value = true) {
+    this.assertCurrentField();
+    this.mergeFieldOperator(this.currentField!, "$exists", value);
+    return this;
+  }
+
+  size(value: number) {
+    this.assertCurrentField();
+    this.mergeFieldOperator(this.currentField!, "$size", value);
+    return this;
+  }
+
+  text(
+    search: string,
+    options?: {
+      language?: string;
+      caseSensitive?: boolean;
+      diacriticSensitive?: boolean;
+    },
+  ) {
+    const current = (this.filter as Record<string, unknown>).$text;
+    const textQuery = {
+      ...(current && typeof current === "object" && !Array.isArray(current)
+        ? current as Record<string, unknown>
+        : {}),
+      $search: search,
+    } as Record<string, unknown>;
+
+    if (options?.language !== undefined) {
+      textQuery.$language = options.language;
+    }
+
+    if (options?.caseSensitive !== undefined) {
+      textQuery.$caseSensitive = options.caseSensitive;
+    }
+
+    if (options?.diacriticSensitive !== undefined) {
+      textQuery.$diacriticSensitive = options.diacriticSensitive;
+    }
+
+    (this.filter as Record<string, unknown>).$text = textQuery;
+    return this;
+  }
+
   and(filter: Filter<Type>) {
     const current = (this.filter as Record<string, unknown>).$and;
     const group = Array.isArray(current) ? current : [];

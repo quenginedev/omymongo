@@ -122,10 +122,10 @@ Documents are validated against your Zod schema on writes and full-document read
 - [x] Pagination helper: paginate
 - [x] Populate support via refs mapping
 - [x] Rich index definitions: compound, unique, sparse, TTL, partial
+- [x] More fluent operators (regex, exists, size, text)
 
 ### Todo
 
-- [ ] More fluent operators (regex, exists, size, text)
 - [ ] Transactions and sessions helpers
 - [ ] Better projection output typing for fluent select
 
@@ -381,7 +381,6 @@ Detailed milestone board: see [ROADMAP.md](./ROADMAP.md).
 Planned improvements include:
 
 - Richer index definitions (compound, unique, TTL, partial)
-- More fluent operators (regex, exists, size, text)
 - Transactions and sessions helpers
 - Better projection output typing for fluent selects
 - Realtime pub/sub to stream document changes over WebSocket or third-party brokers

@@ -4,6 +4,7 @@ import z from "zod";
 import {
   connect,
   createCollection,
+  createConnection,
   defineSchema,
   disconnect,
   ObjectID,
@@ -12,6 +13,13 @@ import {
 } from "../src/index";
 
 await connect({
+  uri: "mongodb://localhost:27017/testdb",
+  appName: "TestAppV2",
+  maxPoolSize: 10,
+  minPoolSize: 0,
+});
+
+const connection = createConnection({
   uri: "mongodb://localhost:27017/testdb",
   appName: "TestAppV2",
   maxPoolSize: 10,
@@ -81,6 +89,7 @@ const FluentCollection = createCollection({
     name: z.string(),
     score: z.number(),
     tags: z.array(z.string()),
+    bio: z.string().optional(),
   }),
 });
 
@@ -172,7 +181,9 @@ describe("v2 APIs", () => {
     expect(deleted).not.toBeNull();
 
     const activeCount = await SoftDeleteCollection.countDocuments();
-    const allCount = await SoftDeleteCollection.countDocuments({}, { withDeleted: true });
+    const allCount = await SoftDeleteCollection.countDocuments({}, {
+      withDeleted: true,
+    });
     expect(activeCount).toBe(1);
     expect(allCount).toBe(2);
 
@@ -297,5 +308,65 @@ describe("v2 APIs", () => {
 
     expect(byId).not.toBeNull();
     expect((byId as { name: string }).name).toBe("Zed");
+  });
+
+  test.sequential("should support fluent regex, exists, size and text operators", async () => {
+    await FluentCollection.hardDeleteMany({});
+
+    await connection.withLifetime(async (client) => {
+      await client.db().collection("v2_fluent_collection").createIndex({
+        name: "text",
+        bio: "text",
+      });
+    });
+
+    await FluentCollection.insertMany([
+      {
+        name: "Ada",
+        score: 91,
+        tags: ["core", "platform"],
+        bio: "Platform engineer",
+      },
+      {
+        name: "Ben",
+        score: 72,
+        tags: ["edge"],
+        bio: "Edge runtime specialist",
+      },
+      { name: "Cara", score: 88, tags: ["core", "edge"] },
+    ]);
+
+    const regexMatch = await FluentCollection
+      .findFluent()
+      .where("name")
+      .regex(/^a/i)
+      .execMany();
+    expect(regexMatch.length).toBe(1);
+    expect(regexMatch[0].name).toBe("Ada");
+
+    const hasNoBio = await FluentCollection
+      .findFluent()
+      .where("bio")
+      .exists(false)
+      .execMany();
+    expect(hasNoBio.length).toBe(1);
+    expect(hasNoBio[0].name).toBe("Cara");
+
+    const twoTags = await FluentCollection
+      .findFluent()
+      .where("tags")
+      .size(2)
+      .sort({ score: -1 })
+      .execMany();
+    expect(twoTags.length).toBe(2);
+    expect(twoTags[0].name).toBe("Ada");
+    expect(twoTags[1].name).toBe("Cara");
+
+    const textMatch = await FluentCollection
+      .findFluent()
+      .text("platform")
+      .execMany();
+    expect(textMatch.length).toBe(1);
+    expect(textMatch[0].name).toBe("Ada");
   });
 });
