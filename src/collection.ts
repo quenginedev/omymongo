@@ -1111,11 +1111,7 @@ export class CollectionQuery<Type> {
       diacriticSensitive?: boolean;
     },
   ) {
-    const current = (this.filter as Record<string, unknown>).$text;
     const textQuery = {
-      ...(current && typeof current === "object" && !Array.isArray(current)
-        ? current as Record<string, unknown>
-        : {}),
       $search: search,
     } as Record<string, unknown>;
 
