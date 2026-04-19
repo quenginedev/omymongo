@@ -280,6 +280,34 @@ const page = await Users.paginate(
 console.log(active, all, page.meta);
 ```
 
+### Transactions and Sessions
+
+```ts
+import { withSession, withTransaction } from "omymongo";
+
+await withTransaction(async ({ session }) => {
+  await Users.insertOne(
+    { name: "Nana", email: "nana@example.com", tags: ["trial"] },
+    { session },
+  );
+
+  await Users.updateOne(
+    { email: "nana@example.com" },
+    { $set: { tags: ["trial", "active"] } },
+    { session },
+  );
+});
+
+await withSession(async ({ session }) => {
+  const user = await Users
+    .findFluent({ email: "nana@example.com" })
+    .session(session)
+    .execOne();
+
+  console.log(user);
+});
+```
+
 ### Populate with refs
 
 ```ts
