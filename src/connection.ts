@@ -91,6 +91,7 @@ export class Connection {
     try {
       return this.client!.startSession();
     } catch (error) {
+      console.error("Failed to start MongoDB session:", error);
       await this.disconnect();
       throw new ConnectionError("Failed to start MongoDB session");
     }
