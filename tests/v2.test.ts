@@ -10,6 +10,8 @@ import {
   ObjectID,
   paginationPlugin,
   softDeletePlugin,
+  withSession,
+  withTransaction,
 } from "../src/index";
 
 await connect({
@@ -92,6 +94,22 @@ const FluentCollection = createCollection({
     bio: z.string().optional(),
   }),
 });
+
+const TransactionCollection = createCollection({
+  name: "v2_transaction_collection",
+  schema: z.object({
+    key: z.string(),
+    value: z.number(),
+  }),
+});
+
+const supportsTransactions = async () => {
+  const hello = await connection.withLifetime(async (client) => {
+    return await client.db("admin").command({ hello: 1 });
+  });
+
+  return Boolean(hello.setName) || hello.msg === "isdbgrid";
+};
 
 describe("v2 APIs", () => {
   test.sequential("should strip unknown keys when strict mode is strip", async () => {
@@ -368,5 +386,70 @@ describe("v2 APIs", () => {
       .execMany();
     expect(textMatch.length).toBe(1);
     expect(textMatch[0].name).toBe("Ada");
+  });
+
+  test.sequential("should support session-bound operations", async () => {
+    await TransactionCollection.hardDeleteMany({});
+
+    await withSession(async ({ session }) => {
+      await TransactionCollection.insertOne(
+        { key: "session", value: 1 },
+        { session },
+      );
+
+      const found = await TransactionCollection.findOne(
+        { key: "session" },
+        { session },
+      );
+
+      expect(found).not.toBeNull();
+      expect(found?.value).toBe(1);
+    });
+
+    const persisted = await TransactionCollection.findOne({ key: "session" });
+    expect(persisted).not.toBeNull();
+  });
+
+  test.sequential("should commit transaction when callback succeeds", async () => {
+    if (!(await supportsTransactions())) return;
+
+    await TransactionCollection.hardDeleteMany({});
+
+    await withTransaction(async ({ session }) => {
+      await TransactionCollection.insertOne(
+        { key: "tx-commit", value: 10 },
+        { session },
+      );
+
+      await TransactionCollection.updateOne(
+        { key: "tx-commit" },
+        { $set: { value: 20 } },
+        { session },
+      );
+    });
+
+    const found = await TransactionCollection.findOne({ key: "tx-commit" });
+    expect(found).not.toBeNull();
+    expect(found?.value).toBe(20);
+  });
+
+  test.sequential("should rollback transaction when callback throws", async () => {
+    if (!(await supportsTransactions())) return;
+
+    await TransactionCollection.hardDeleteMany({});
+
+    await expect(
+      withTransaction(async ({ session }) => {
+        await TransactionCollection.insertOne(
+          { key: "tx-rollback", value: 5 },
+          { session },
+        );
+
+        throw new Error("force rollback");
+      }),
+    ).rejects.toThrow("force rollback");
+
+    const found = await TransactionCollection.findOne({ key: "tx-rollback" });
+    expect(found).toBeNull();
   });
 });

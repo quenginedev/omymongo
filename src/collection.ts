@@ -25,6 +25,7 @@ import type {
   PopulateOption,
   QueryOptions,
   ReplaceOneOptions,
+  SessionOperationOptions,
   Update,
   UpdateManyOptions,
   UpdateOneOptions,
@@ -93,6 +94,12 @@ export type IndexMap<Type> = Partial<Record<keyof Type, IndexDirection>>;
 export type CollectionIndexes<Type> = IndexMap<Type> | RichIndexDefinition<
   Type
 >[];
+
+type DeleteOptions = SessionOperationOptions;
+
+type RestoreOptions = SessionOperationOptions;
+
+type HardDeleteOptions = SessionOperationOptions;
 
 export class Collection<Type> {
   private schema: z.ZodType<Type>;
@@ -287,7 +294,10 @@ export class Collection<Type> {
     this.indexesEnsured = true;
   }
 
-  async insertOne(document: OptionalId<Type>): Promise<Document<Type>> {
+  async insertOne(
+    document: OptionalId<Type>,
+    options?: SessionOperationOptions,
+  ): Promise<Document<Type>> {
     await this.ensureIndexes();
     await this.runHooks("pre", {
       operation: "insertOne",
@@ -304,7 +314,9 @@ export class Collection<Type> {
     const response = await this.connection.withLifetime(async (client) => {
       const db = client.db();
       const collection = db.collection<Document<Type>>(this.name);
-      return await collection.insertOne(insertPayload);
+      return await collection.insertOne(insertPayload, {
+        session: options?.session,
+      });
     });
 
     if (!response.acknowledged) {
@@ -322,7 +334,10 @@ export class Collection<Type> {
     return inserted;
   }
 
-  async insertMany(documents: OptionalId<Type>[]): Promise<Document<Type>[]> {
+  async insertMany(
+    documents: OptionalId<Type>[],
+    options?: SessionOperationOptions,
+  ): Promise<Document<Type>[]> {
     await this.ensureIndexes();
     await this.runHooks("pre", {
       operation: "insertMany",
@@ -340,7 +355,9 @@ export class Collection<Type> {
     const response = await this.connection.withLifetime(async (client) => {
       const db = client.db();
       const collection = db.collection<Document<Type>>(this.name);
-      return await collection.insertMany(insertPayloads);
+      return await collection.insertMany(insertPayloads, {
+        session: options?.session,
+      });
     });
 
     if (!response.acknowledged) {
@@ -362,14 +379,17 @@ export class Collection<Type> {
     return inserted;
   }
 
-  async create(document: OptionalId<Type>): Promise<Document<Type>> {
+  async create(
+    document: OptionalId<Type>,
+    options?: SessionOperationOptions,
+  ): Promise<Document<Type>> {
     await this.runHooks("pre", {
       operation: "create",
       collection: this.name,
       payload: document,
     });
 
-    return this.insertOne(document);
+    return this.insertOne(document, options);
   }
 
   async findOne(
@@ -390,6 +410,7 @@ export class Collection<Type> {
       return await collection.findOne(scopedFilter, {
         projection: options?.projection,
         sort: options?.sort,
+        session: options?.session,
       });
     });
     if (!response) return null;
@@ -400,6 +421,7 @@ export class Collection<Type> {
     const [result] = await this.populateDocuments(
       [rawResult],
       options?.populate,
+      options,
     );
     await this.runHooks("post", {
       operation: "findOne",
@@ -410,9 +432,12 @@ export class Collection<Type> {
     return result ?? null;
   }
 
-  async findById(id: Document<Type>["_id"]): Promise<Document<Type> | null> {
+  async findById(
+    id: Document<Type>["_id"],
+    options?: QueryOptions<Type>,
+  ): Promise<Document<Type> | null> {
     const parsedId = ObjectIdSchema.parse(id);
-    return this.findOne({ _id: parsedId } as Filter<Type>);
+    return this.findOne({ _id: parsedId } as Filter<Type>, options);
   }
 
   async find(
@@ -435,13 +460,18 @@ export class Collection<Type> {
         sort: options?.sort,
         limit: options?.limit,
         skip: options?.skip,
+        session: options?.session,
       }).toArray();
     });
 
     const validated = response
       .map((doc) => this.validateDocument(doc))
       .filter((doc): doc is Document<Type> => doc !== null);
-    const result = await this.populateDocuments(validated, options?.populate);
+    const result = await this.populateDocuments(
+      validated,
+      options?.populate,
+      options,
+    );
 
     await this.runHooks("post", {
       operation: "find",
@@ -453,7 +483,10 @@ export class Collection<Type> {
     return result;
   }
 
-  async deleteOne(filter: Filter<Type>): Promise<Document<Type> | null> {
+  async deleteOne(
+    filter: Filter<Type>,
+    options?: DeleteOptions,
+  ): Promise<Document<Type> | null> {
     await this.ensureIndexes();
     const scopedFilter = this.withScopedFilter(filter, false);
     await this.runHooks("pre", {
@@ -474,12 +507,17 @@ export class Collection<Type> {
               updatedAt: new Date(),
             },
           } as Update<Type>,
-          { returnDocument: "after" },
+          {
+            returnDocument: "after",
+            session: options?.session,
+          },
         );
       }
 
-      const record = await collection.findOne(scopedFilter);
-      await collection.deleteOne(scopedFilter);
+      const record = await collection.findOne(scopedFilter, {
+        session: options?.session,
+      });
+      await collection.deleteOne(scopedFilter, { session: options?.session });
       return record;
     });
 
@@ -496,9 +534,10 @@ export class Collection<Type> {
 
   async findByIdAndDelete(
     id: Document<Type>["_id"],
+    options?: DeleteOptions,
   ): Promise<Document<Type> | null> {
     const parsedId = ObjectIdSchema.parse(id);
-    return this.deleteOne({ _id: parsedId } as Filter<Type>);
+    return this.deleteOne({ _id: parsedId } as Filter<Type>, options);
   }
 
   async updateOne(
@@ -532,6 +571,7 @@ export class Collection<Type> {
         {
           returnDocument: "after",
           upsert: options?.upsert,
+          session: options?.session,
         },
       );
     });
@@ -584,6 +624,7 @@ export class Collection<Type> {
 
       return await collection.updateMany(scopedFilter, safeUpdate, {
         upsert: options?.upsert,
+        session: options?.session,
       });
     });
 
@@ -628,6 +669,7 @@ export class Collection<Type> {
         {
           returnDocument: "after",
           upsert: options?.upsert,
+          session: options?.session,
         },
       );
     });
@@ -644,7 +686,10 @@ export class Collection<Type> {
     return result;
   }
 
-  async deleteMany(filter: Filter<Type>): Promise<number> {
+  async deleteMany(
+    filter: Filter<Type>,
+    options?: DeleteOptions,
+  ): Promise<number> {
     await this.ensureIndexes();
     const scopedFilter = this.withScopedFilter(filter, false);
     await this.runHooks("pre", {
@@ -665,10 +710,15 @@ export class Collection<Type> {
               updatedAt: new Date(),
             },
           } as Update<Type>,
+          {
+            session: options?.session,
+          },
         );
       }
 
-      return await collection.deleteMany(scopedFilter);
+      return await collection.deleteMany(scopedFilter, {
+        session: options?.session,
+      });
     });
 
     await this.runHooks("post", {
@@ -687,20 +737,22 @@ export class Collection<Type> {
 
   async countDocuments(
     filter: Filter<Type> = {} as Filter<Type>,
-    options?: Pick<QueryOptions<Type>, "withDeleted">,
+    options?: Pick<QueryOptions<Type>, "withDeleted" | "session">,
   ): Promise<number> {
     await this.ensureIndexes();
     const scopedFilter = this.withScopedFilter(filter, options?.withDeleted);
     return this.connection.withLifetime(async (client) => {
       const db = client.db();
       const collection = db.collection<Document<Type>>(this.name);
-      return await collection.countDocuments(scopedFilter);
+      return await collection.countDocuments(scopedFilter, {
+        session: options?.session,
+      });
     });
   }
 
   async exists(
     filter: Filter<Type>,
-    options?: Pick<QueryOptions<Type>, "withDeleted">,
+    options?: Pick<QueryOptions<Type>, "withDeleted" | "session">,
   ): Promise<boolean> {
     const count = await this.countDocuments(filter, options);
     return count > 0;
@@ -709,14 +761,16 @@ export class Collection<Type> {
   async distinct<Key extends keyof Type>(
     field: Key,
     filter: Filter<Type> = {} as Filter<Type>,
-    options?: Pick<QueryOptions<Type>, "withDeleted">,
+    options?: Pick<QueryOptions<Type>, "withDeleted" | "session">,
   ): Promise<DistinctValue<Type[Key]>[]> {
     await this.ensureIndexes();
     const scopedFilter = this.withScopedFilter(filter, options?.withDeleted);
     return this.connection.withLifetime(async (client) => {
       const db = client.db();
       const collection = db.collection<Document<Type>>(this.name);
-      const values = await collection.distinct(String(field), scopedFilter);
+      const values = await collection.distinct(String(field), scopedFilter, {
+        session: options?.session,
+      });
       return values as DistinctValue<Type[Key]>[];
     });
   }
@@ -732,11 +786,15 @@ export class Collection<Type> {
       return await collection.aggregate<Result>(pipeline, {
         allowDiskUse: options?.allowDiskUse,
         maxTimeMS: options?.maxTimeMS,
+        session: options?.session,
       }).toArray();
     });
   }
 
-  async restoreOne(filter: Filter<Type>): Promise<Document<Type> | null> {
+  async restoreOne(
+    filter: Filter<Type>,
+    options?: RestoreOptions,
+  ): Promise<Document<Type> | null> {
     if (!this.softDeleteField) {
       throw new CollectionError(
         "Soft delete is not enabled on this collection",
@@ -760,7 +818,10 @@ export class Collection<Type> {
             updatedAt: new Date(),
           },
         } as Update<Type>,
-        { returnDocument: "after" },
+        {
+          returnDocument: "after",
+          session: options?.session,
+        },
       );
     });
 
@@ -768,12 +829,17 @@ export class Collection<Type> {
     return this.validateDocument(response);
   }
 
-  async hardDeleteOne(filter: Filter<Type>): Promise<Document<Type> | null> {
+  async hardDeleteOne(
+    filter: Filter<Type>,
+    options?: HardDeleteOptions,
+  ): Promise<Document<Type> | null> {
     const response = await this.connection.withLifetime(async (client) => {
       const db = client.db();
       const collection = db.collection<Document<Type>>(this.name);
-      const record = await collection.findOne(filter);
-      await collection.deleteOne(filter);
+      const record = await collection.findOne(filter, {
+        session: options?.session,
+      });
+      await collection.deleteOne(filter, { session: options?.session });
       return record;
     });
 
@@ -781,11 +847,14 @@ export class Collection<Type> {
     return this.validateDocument(response);
   }
 
-  async hardDeleteMany(filter: Filter<Type>): Promise<number> {
+  async hardDeleteMany(
+    filter: Filter<Type>,
+    options?: HardDeleteOptions,
+  ): Promise<number> {
     const response = await this.connection.withLifetime(async (client) => {
       const db = client.db();
       const collection = db.collection<Document<Type>>(this.name);
-      return await collection.deleteMany(filter);
+      return await collection.deleteMany(filter, { session: options?.session });
     });
 
     return response.deletedCount;
@@ -900,6 +969,7 @@ export class Collection<Type> {
   private async populateDocuments(
     docs: Document<Type>[],
     populate?: PopulateOption<Type>,
+    options?: SessionOperationOptions,
   ): Promise<Document<Type>[]> {
     if (!populate || docs.length === 0) return docs;
 
@@ -945,6 +1015,8 @@ export class Collection<Type> {
           [foreignField]: {
             $in: foreignField === "_id" ? parsedValues : values,
           },
+        }, {
+          session: options?.session,
         }).toArray();
       });
 
@@ -1174,6 +1246,11 @@ export class CollectionQuery<Type> {
 
   withDeleted() {
     this.options.withDeleted = true;
+    return this;
+  }
+
+  session(session: SessionOperationOptions["session"]) {
+    this.options.session = session;
     return this;
   }
 

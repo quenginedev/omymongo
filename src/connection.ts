@@ -1,6 +1,12 @@
 import { ConnectionOptionsSchema } from "./schema.ts";
-import type { ConnectionOptionsType } from "./types.ts";
+import type {
+  ConnectionOptionsType,
+  SessionContext,
+  TransactionContext,
+  TransactionRunOptions,
+} from "./types.ts";
 import { MongoClient } from "mongodb";
+import type { ClientSession } from "mongodb";
 import { OmyMongoError } from "./errors.ts";
 
 export class ConnectionError extends OmyMongoError {
@@ -79,6 +85,49 @@ export class Connection {
       await this.disconnect();
     }
   }
+
+  async startSession(): Promise<ClientSession> {
+    await this.connect();
+    try {
+      return this.client!.startSession();
+    } catch (error) {
+      await this.disconnect();
+      throw new ConnectionError("Failed to start MongoDB session");
+    }
+  }
+
+  async withSession<T>(
+    fn: (context: SessionContext) => Promise<T>,
+  ): Promise<T> {
+    const session = await this.startSession();
+    try {
+      return await fn({ session });
+    } finally {
+      await session.endSession();
+      await this.disconnect();
+    }
+  }
+
+  async withTransaction<T>(
+    fn: (context: TransactionContext) => Promise<T>,
+    options?: TransactionRunOptions,
+  ): Promise<T> {
+    return this.withSession(async ({ session }) => {
+      let hasResult = false;
+      let result: T | undefined;
+
+      await session.withTransaction(async () => {
+        result = await fn({ session });
+        hasResult = true;
+      }, options);
+
+      if (!hasResult) {
+        throw new ConnectionError("Transaction aborted before completion");
+      }
+
+      return result as T;
+    });
+  }
 }
 
 export const createConnection = (options: ConnectionOptionsType) => {
@@ -94,4 +143,24 @@ export const connect = async (options: ConnectionOptionsType) => {
 export const disconnect = async () => {
   if (!Connection.instance) return;
   await Connection.instance.disconnect();
+};
+
+export const startSession = async () => {
+  const connection = Connection.getInstance();
+  return connection.startSession();
+};
+
+export const withSession = async <T>(
+  fn: (context: SessionContext) => Promise<T>,
+) => {
+  const connection = Connection.getInstance();
+  return connection.withSession(fn);
+};
+
+export const withTransaction = async <T>(
+  fn: (context: TransactionContext) => Promise<T>,
+  options?: TransactionRunOptions,
+) => {
+  const connection = Connection.getInstance();
+  return connection.withTransaction(fn, options);
 };
