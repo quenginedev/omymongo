@@ -123,10 +123,10 @@ Documents are validated against your Zod schema on writes and full-document read
 - [x] Populate support via refs mapping
 - [x] Rich index definitions: compound, unique, sparse, TTL, partial
 - [x] More fluent operators (regex, exists, size, text)
+- [x] Transactions and sessions helpers
 
 ### Todo
 
-- [ ] Transactions and sessions helpers
 - [ ] Better projection output typing for fluent select
 
 ## Usage Examples
