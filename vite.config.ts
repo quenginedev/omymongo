@@ -4,7 +4,7 @@ import dts from "vite-plugin-dts";
 export default defineConfig({
   plugins: [dts({ insertTypesEntry: true })],
   staged: {
-    "*.{ts}": "vp check --fix",
+    "src/**/*.ts": "vp check --fix",
   },
   pack: {
     dts: {
