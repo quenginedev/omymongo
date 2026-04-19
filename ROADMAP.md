@@ -11,12 +11,12 @@ This board translates the long-term vision into execution milestones with clear 
 
 ## Milestone Board (12 Months)
 
-| Milestone | Window | Theme | Outcome |
-|---|---|---|---|
-| M1 | Q1 | Migration Engine Foundation | Drift-safe schema evolution for live datasets |
-| M2 | Q2 | Realtime Pub/Sub Core | Typed change streams over WebSocket and broker adapters |
-| M3 | Q3 | Reliability Toolkit | Transaction helpers, outbox, and idempotent write paths |
-| M4 | Q4 | Query Intelligence + DX | Index advice, perf insights, and stronger fluent typing |
+| Milestone | Window | Theme                       | Outcome                                                 |
+| --------- | ------ | --------------------------- | ------------------------------------------------------- |
+| M1        | Q1     | Migration Engine Foundation | Drift-safe schema evolution for live datasets           |
+| M2        | Q2     | Realtime Pub/Sub Core       | Typed change streams over WebSocket and broker adapters |
+| M3        | Q3     | Reliability Toolkit         | Transaction helpers, outbox, and idempotent write paths |
+| M4        | Q4     | Query Intelligence + DX     | Index advice, perf insights, and stronger fluent typing |
 
 ## M1 - Migration Engine Foundation (Q1)
 
@@ -121,10 +121,7 @@ await db.transaction(async (tx) => {
   await Outbox.withTransaction(tx).publish("user.activated", { id });
 });
 
-await User.idempotent("activate-user-123").updateOne(
-  { _id: id },
-  { $set: { status: "active" } },
-);
+await User.idempotent("activate-user-123").updateOne({ _id: id }, { $set: { status: "active" } });
 ```
 
 ### Success Metrics
@@ -152,14 +149,11 @@ await User.idempotent("activate-user-123").updateOne(
 ### API Shape (Draft)
 
 ```ts
-const report = await User.analyzeQuery(
-  User.where("email").equals("a@b.com").execMany,
-);
+const report = await User.analyzeQuery(User.where("email").equals("a@b.com").execMany);
 
 console.log(report.indexRecommendations);
 
-const users = await User
-  .findFluent()
+const users = await User.findFluent()
   .where("name")
   .regex(/^er/i)
   .select({ name: 1, email: 1 })

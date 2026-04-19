@@ -2,6 +2,15 @@
   "name": "omymongo",
   "version": "0.1.1",
   "description": "TypeScript-first MongoDB toolkit with Zod validation and fluent model APIs.",
+  "keywords": [
+    "mongodb",
+    "mongoose",
+    "odm",
+    "query-builder",
+    "typescript",
+    "validation",
+    "zod"
+  ],
   "homepage": "https://github.com/quenginedev/omymongo#readme",
   "bugs": {
     "url": "https://github.com/quenginedev/omymongo/issues"
@@ -12,24 +21,12 @@
     "type": "git",
     "url": "git+https://github.com/quenginedev/omymongo.git"
   },
-  "keywords": [
-    "mongodb",
-    "mongoose",
-    "typescript",
-    "zod",
-    "odm",
-    "query-builder",
-    "validation"
-  ],
   "files": [
     "dist"
   ],
   "type": "module",
-  "types": "./dist/index.d.ts",
   "sideEffects": false,
-  "engines": {
-    "node": ">=20"
-  },
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": "./dist/index.mjs",
     "./package.json": "./package.json"
@@ -44,6 +41,11 @@
     "check": "vp check",
     "prepublishOnly": "vp run build"
   },
+  "dependencies": {
+    "bson-objectid": "^2.0.4",
+    "mongodb": "^7.1.1",
+    "zod": "^4.3.6"
+  },
   "devDependencies": {
     "@types/node": "^25.5.0",
     "@typescript/native-preview": "7.0.0-dev.20260328.1",
@@ -52,10 +54,8 @@
     "vite-plugin-dts": "^4.5.4",
     "vite-plus": "^0.1.14"
   },
-  "packageManager": "pnpm@10.33.0",
-  "dependencies": {
-    "bson-objectid": "^2.0.4",
-    "mongodb": "^7.1.1",
-    "zod": "^4.3.6"
-  }
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@10.33.0"
 }

@@ -1,8 +1,11 @@
 import { defineConfig } from "vite-plus";
-import dts from 'vite-plugin-dts'
+import dts from "vite-plugin-dts";
 
 export default defineConfig({
   plugins: [dts({ insertTypesEntry: true })],
+  staged: {
+    "**/*.ts": "pnpm check --fix",
+  },
   pack: {
     dts: {
       tsgo: true,

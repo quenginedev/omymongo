@@ -14,8 +14,6 @@ export const softDeletePlugin = <Type>(
   }
 };
 
-export const paginationPlugin = <Type>(
-  _collection: import("./collection.ts").Collection<Type>,
-) => {
+export const paginationPlugin = <Type>(_collection: import("./collection.ts").Collection<Type>) => {
   // Pagination is implemented directly on the collection API as paginate().
 };

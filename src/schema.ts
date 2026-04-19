@@ -1,35 +1,44 @@
 import z from "zod";
-import { ObjectId } from 'mongodb'
+import { ObjectId } from "mongodb";
 
-export const ObjectID = ObjectId
+export const ObjectID = ObjectId;
 
-export const ObjectIdSchema = z.union([z.string(), z.instanceof(ObjectId)])
-  .refine((val) => {
-    if (typeof val === "string") {
-      return /^[0-9a-fA-F]{24}$/.test(val);
-    }
-    return val instanceof ObjectId;
-  }, {
-    message: "Invalid ObjectId format",
-  })
-  .transform((val) => typeof val === "string" ? new ObjectId(val) : val);
+export const ObjectIdSchema = z
+  .union([z.string(), z.instanceof(ObjectId)])
+  .refine(
+    (val) => {
+      if (typeof val === "string") {
+        return /^[0-9a-fA-F]{24}$/.test(val);
+      }
+      return val instanceof ObjectId;
+    },
+    {
+      message: "Invalid ObjectId format",
+    },
+  )
+  .transform((val) => (typeof val === "string" ? new ObjectId(val) : val));
 
 export const ConnectionOptionsSchema = z.object({
-  uri: z.url().refine((url) => {
-    try {
-      const parsedUrl = new URL(url);
-      return ["mongodb:", "mongodb+srv:"].includes(parsedUrl.protocol);
-    } catch {
-      return false;
-    }
-  }, {
-    message: "Invalid MongoDB connection string",
-  }),
+  uri: z.url().refine(
+    (url) => {
+      try {
+        const parsedUrl = new URL(url);
+        return ["mongodb:", "mongodb+srv:"].includes(parsedUrl.protocol);
+      } catch {
+        return false;
+      }
+    },
+    {
+      message: "Invalid MongoDB connection string",
+    },
+  ),
   appName: z.string().optional(),
-  auth: z.object({
-    username: z.string(),
-    password: z.string(),
-  }).optional(),
+  auth: z
+    .object({
+      username: z.string(),
+      password: z.string(),
+    })
+    .optional(),
   maxPoolSize: z.number().optional(),
   minPoolSize: z.number().optional(),
 });
@@ -108,7 +117,7 @@ export interface BaseFilter<Value = unknown> {
   $not?: Partial<BaseFilter<Value>>;
 }
 
-export const BaseFilterSchema: z.ZodType<Partial<BaseFilter>> = z.lazy(() => 
+export const BaseFilterSchema: z.ZodType<Partial<BaseFilter>> = z.lazy(() =>
   z.object({
     $exists: z.boolean().optional(),
     $type: z.union([z.string(), z.array(z.string())]).optional(),
@@ -119,16 +128,18 @@ export const BaseFilterSchema: z.ZodType<Partial<BaseFilter>> = z.lazy(() =>
     $lt: z.unknown().optional(),
     $lte: z.unknown().optional(),
     $ne: z.unknown().optional(),
-    $regex: z.union([
-      z.string(),
-      z.object({
-        pattern: z.string(),
-        options: z.string().optional(),
-      }),
-    ]).optional(),
+    $regex: z
+      .union([
+        z.string(),
+        z.object({
+          pattern: z.string(),
+          options: z.string().optional(),
+        }),
+      ])
+      .optional(),
     // Reference the schema directly here, no need for extra z.lazy inside the object
     $and: z.array(BaseFilterSchema).optional(),
     $or: z.array(BaseFilterSchema).optional(),
     $not: BaseFilterSchema.optional(),
-  })
+  }),
 );

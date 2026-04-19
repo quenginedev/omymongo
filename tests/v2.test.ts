@@ -10,6 +10,8 @@ import {
   ObjectID,
   paginationPlugin,
   softDeletePlugin,
+  withSession,
+  withTransaction,
 } from "../src/index";
 
 await connect({
@@ -52,9 +54,11 @@ const StrictCollection = createCollection({
 
 const SoftDeleteCollection = createCollection({
   name: "v2_soft_delete_collection",
-  schema: defineSchema(z.object({
-    title: z.string(),
-  })),
+  schema: defineSchema(
+    z.object({
+      title: z.string(),
+    }),
+  ),
 });
 
 SoftDeleteCollection.use(softDeletePlugin, { fieldName: "deletedAt" });
@@ -92,6 +96,22 @@ const FluentCollection = createCollection({
     bio: z.string().optional(),
   }),
 });
+
+const TransactionCollection = createCollection({
+  name: "v2_transaction_collection",
+  schema: z.object({
+    key: z.string(),
+    value: z.number(),
+  }),
+});
+
+const supportsTransactions = async () => {
+  const hello = await connection.withLifetime(async (client) => {
+    return await client.db("admin").command({ hello: 1 });
+  });
+
+  return Boolean(hello.setName) || hello.msg === "isdbgrid";
+};
 
 describe("v2 APIs", () => {
   test.sequential("should strip unknown keys when strict mode is strip", async () => {
@@ -154,14 +174,9 @@ describe("v2 APIs", () => {
 
   test.sequential("should support chainable query builder", async () => {
     await SoftDeleteCollection.hardDeleteMany({});
-    await SoftDeleteCollection.insertMany([
-      { title: "B" },
-      { title: "A" },
-      { title: "C" },
-    ]);
+    await SoftDeleteCollection.insertMany([{ title: "B" }, { title: "A" }, { title: "C" }]);
 
-    const docs = await SoftDeleteCollection
-      .query({ title: { $in: ["A", "B", "C"] } })
+    const docs = await SoftDeleteCollection.query({ title: { $in: ["A", "B", "C"] } })
       .sort({ title: 1 })
       .limit(2)
       .exec();
@@ -181,9 +196,12 @@ describe("v2 APIs", () => {
     expect(deleted).not.toBeNull();
 
     const activeCount = await SoftDeleteCollection.countDocuments();
-    const allCount = await SoftDeleteCollection.countDocuments({}, {
-      withDeleted: true,
-    });
+    const allCount = await SoftDeleteCollection.countDocuments(
+      {},
+      {
+        withDeleted: true,
+      },
+    );
     expect(activeCount).toBe(1);
     expect(allCount).toBe(2);
 
@@ -194,10 +212,7 @@ describe("v2 APIs", () => {
     expect(afterRestore).toBe(2);
 
     await SoftDeleteCollection.findByIdAndDelete(first._id);
-    const withDeleted = await SoftDeleteCollection.exists(
-      { title: "keep" },
-      { withDeleted: true },
-    );
+    const withDeleted = await SoftDeleteCollection.exists({ title: "keep" }, { withDeleted: true });
     expect(withDeleted).toBe(true);
   });
 
@@ -237,10 +252,7 @@ describe("v2 APIs", () => {
       authorId: author._id,
     });
 
-    const found = await BookCollection.findOne(
-      { title: "DX Patterns" },
-      { populate: "authorId" },
-    );
+    const found = await BookCollection.findOne({ title: "DX Patterns" }, { populate: "authorId" });
 
     expect(found).not.toBeNull();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -256,8 +268,7 @@ describe("v2 APIs", () => {
       { name: "Cara", score: 88, tags: ["edge"] },
     ]);
 
-    const docs = await FluentCollection
-      .findFluent()
+    const docs = await FluentCollection.findFluent()
       .where("name")
       .in(["Ada", "Cara"])
       .sort({ score: -1 })
@@ -277,19 +288,12 @@ describe("v2 APIs", () => {
       { name: "Ola", score: 96, tags: ["beta"] },
     ]);
 
-    const topMid = await FluentCollection
-      .where("score")
-      .gte(80)
-      .lt(95)
-      .sort({ score: -1 })
-      .first();
+    const topMid = await FluentCollection.where("score").gte(80).lt(95).sort({ score: -1 }).first();
 
     expect(topMid).not.toBeNull();
     expect(topMid?.name).toBe("Noah");
 
-    const single = await FluentCollection
-      .findOneFluent({ tags: { $in: ["beta"] } })
-      .execOne();
+    const single = await FluentCollection.findOneFluent({ tags: { $in: ["beta"] } }).execOne();
 
     expect(single).not.toBeNull();
     expect(single?.name).toBe("Ola");
@@ -336,24 +340,15 @@ describe("v2 APIs", () => {
       { name: "Cara", score: 88, tags: ["core", "edge"] },
     ]);
 
-    const regexMatch = await FluentCollection
-      .findFluent()
-      .where("name")
-      .regex(/^a/i)
-      .execMany();
+    const regexMatch = await FluentCollection.findFluent().where("name").regex(/^a/i).execMany();
     expect(regexMatch.length).toBe(1);
     expect(regexMatch[0].name).toBe("Ada");
 
-    const hasNoBio = await FluentCollection
-      .findFluent()
-      .where("bio")
-      .exists(false)
-      .execMany();
+    const hasNoBio = await FluentCollection.findFluent().where("bio").exists(false).execMany();
     expect(hasNoBio.length).toBe(1);
     expect(hasNoBio[0].name).toBe("Cara");
 
-    const twoTags = await FluentCollection
-      .findFluent()
+    const twoTags = await FluentCollection.findFluent()
       .where("tags")
       .size(2)
       .sort({ score: -1 })
@@ -362,11 +357,68 @@ describe("v2 APIs", () => {
     expect(twoTags[0].name).toBe("Ada");
     expect(twoTags[1].name).toBe("Cara");
 
-    const textMatch = await FluentCollection
-      .findFluent()
-      .text("platform")
-      .execMany();
+    const textMatch = await FluentCollection.findFluent().text("platform").execMany();
     expect(textMatch.length).toBe(1);
     expect(textMatch[0].name).toBe("Ada");
+  });
+
+  test.sequential("should support session-bound operations", async () => {
+    await TransactionCollection.hardDeleteMany({});
+
+    await withSession(async ({ session }) => {
+      await TransactionCollection.insertOne({ key: "session", value: 1 }, { session });
+
+      const found = await TransactionCollection.findOne({ key: "session" }, { session });
+
+      expect(found).not.toBeNull();
+      expect(found?.value).toBe(1);
+
+      const page = await TransactionCollection.paginate(
+        { key: "session" },
+        { page: 1, pageSize: 1, session },
+      );
+      expect(page.meta.total).toBe(1);
+      expect(page.data.length).toBe(1);
+    });
+
+    const persisted = await TransactionCollection.findOne({ key: "session" });
+    expect(persisted).not.toBeNull();
+  });
+
+  test.sequential("should commit transaction when callback succeeds", async () => {
+    if (!(await supportsTransactions())) return;
+
+    await TransactionCollection.hardDeleteMany({});
+
+    await withTransaction(async ({ session }) => {
+      await TransactionCollection.insertOne({ key: "tx-commit", value: 10 }, { session });
+
+      await TransactionCollection.updateOne(
+        { key: "tx-commit" },
+        { $set: { value: 20 } },
+        { session },
+      );
+    });
+
+    const found = await TransactionCollection.findOne({ key: "tx-commit" });
+    expect(found).not.toBeNull();
+    expect(found?.value).toBe(20);
+  });
+
+  test.sequential("should rollback transaction when callback throws", async () => {
+    if (!(await supportsTransactions())) return;
+
+    await TransactionCollection.hardDeleteMany({});
+
+    await expect(
+      withTransaction(async ({ session }) => {
+        await TransactionCollection.insertOne({ key: "tx-rollback", value: 5 }, { session });
+
+        throw new Error("force rollback");
+      }),
+    ).rejects.toThrow("force rollback");
+
+    const found = await TransactionCollection.findOne({ key: "tx-rollback" });
+    expect(found).toBeNull();
   });
 });
