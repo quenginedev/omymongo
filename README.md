@@ -52,35 +52,35 @@ import z from "zod";
 import { connect, model, defineSchema } from "omymongo";
 
 await connect({
-	uri: "mongodb://localhost:27017/testdb",
-	appName: "MyApp",
-	maxPoolSize: 10,
-	minPoolSize: 0,
+  uri: "mongodb://localhost:27017/testdb",
+  appName: "MyApp",
+  maxPoolSize: 10,
+  minPoolSize: 0,
 });
 
 const UserSchema = defineSchema(
-	z.object({
-		name: z.string(),
-		email: z.email(),
-		tags: z.array(z.string()).default([]),
-	}),
-	{ strict: "strip" },
+  z.object({
+    name: z.string(),
+    email: z.email(),
+    tags: z.array(z.string()).default([]),
+  }),
+  { strict: "strip" },
 );
 
 const Users = model({
-	name: "users",
-	schema: UserSchema,
-	options: {
-		indexes: {
-			email: 1,
-		},
-	},
+  name: "users",
+  schema: UserSchema,
+  options: {
+    indexes: {
+      email: 1,
+    },
+  },
 });
 
 const created = await Users.create({
-	name: "Ernest",
-	email: "ernest@example.com",
-	tags: ["admin"],
+  name: "Ernest",
+  email: "ernest@example.com",
+  tags: ["admin"],
 });
 
 const found = await Users.findById(created._id);
@@ -101,7 +101,7 @@ console.log(found);
 
 Each saved document includes base fields managed by omymongo:
 
-- _id
+- \_id
 - createdAt
 - updatedAt
 
@@ -134,35 +134,31 @@ Documents are validated against your Zod schema on writes and full-document read
 ### Fluent Queries
 
 ```ts
-const topUsers = await Users
-	.findFluent()
-	.where("tags")
-	.in(["admin", "pro"])
-	.sort({ createdAt: -1 })
-	.limit(10)
-	.execMany();
+const topUsers = await Users.findFluent()
+  .where("tags")
+  .in(["admin", "pro"])
+  .sort({ createdAt: -1 })
+  .limit(10)
+  .execMany();
 
-const oneUser = await Users
-	.where("email")
-	.equals("ernest@example.com")
-	.execOne();
+const oneUser = await Users.where("email").equals("ernest@example.com").execOne();
 ```
 
 ### Querying
 
 ```ts
 const users = await Users.find(
-	{ tags: { $in: ["admin"] } },
-	{
-		sort: { createdAt: -1 },
-		limit: 10,
-		skip: 0,
-	},
+  { tags: { $in: ["admin"] } },
+  {
+    sort: { createdAt: -1 },
+    limit: 10,
+    skip: 0,
+  },
 );
 
 const oneUser = await Users.findOne(
-	{ email: "ernest@example.com" },
-	{ projection: { name: 1, email: 1 }, populate: "teamId" },
+  { email: "ernest@example.com" },
+  { projection: { name: 1, email: 1 }, populate: "teamId" },
 );
 ```
 
@@ -172,13 +168,13 @@ Simple single-field indexes still work:
 
 ```ts
 const Users = model({
-	name: "users",
-	schema: UserSchema,
-	options: {
-		indexes: {
-			email: 1,
-		},
-	},
+  name: "users",
+  schema: UserSchema,
+  options: {
+    indexes: {
+      email: 1,
+    },
+  },
 });
 ```
 
@@ -186,49 +182,48 @@ For compound or option-rich indexes, pass an array of definitions:
 
 ```ts
 const Sessions = model({
-	name: "sessions",
-	schema: defineSchema(z.object({
-		userId: z.string(),
-		email: z.string().optional(),
-		status: z.enum(["active", "archived"]).optional(),
-		nickname: z.string().optional(),
-		expiresAt: z.date().optional(),
-	})),
-	options: {
-		indexes: [
-			{
-				keys: { userId: 1, createdAt: -1 },
-				name: "sessions_user_createdAt",
-			},
-			{
-				keys: { nickname: 1 },
-				sparse: true,
-			},
-			{
-				keys: { expiresAt: 1 },
-				expireAfterSeconds: 0,
-			},
-			{
-				keys: { email: 1 },
-				unique: true,
-				partialFilterExpression: { status: "active" },
-			},
-		],
-	},
+  name: "sessions",
+  schema: defineSchema(
+    z.object({
+      userId: z.string(),
+      email: z.string().optional(),
+      status: z.enum(["active", "archived"]).optional(),
+      nickname: z.string().optional(),
+      expiresAt: z.date().optional(),
+    }),
+  ),
+  options: {
+    indexes: [
+      {
+        keys: { userId: 1, createdAt: -1 },
+        name: "sessions_user_createdAt",
+      },
+      {
+        keys: { nickname: 1 },
+        sparse: true,
+      },
+      {
+        keys: { expiresAt: 1 },
+        expireAfterSeconds: 0,
+      },
+      {
+        keys: { email: 1 },
+        unique: true,
+        partialFilterExpression: { status: "active" },
+      },
+    ],
+  },
 });
 ```
 
 ### Updates
 
 ```ts
-const updated = await Users.findByIdAndUpdate(
-	created._id,
-	{ $set: { name: "Ernest H." } },
-);
+const updated = await Users.findByIdAndUpdate(created._id, { $set: { name: "Ernest H." } });
 
 const modifiedCount = await Users.updateMany(
-	{ tags: { $in: ["admin"] } },
-	{ $set: { tags: ["admin", "active"] } },
+  { tags: { $in: ["admin"] } },
+  { $set: { tags: ["admin", "active"] } },
 );
 
 console.log(updated, modifiedCount);
@@ -238,12 +233,12 @@ console.log(updated, modifiedCount);
 
 ```ts
 await Users.replaceOne(
-	{ email: "ernest@example.com" },
-	{
-		name: "Ernest Hayford",
-		email: "ernest@example.com",
-		tags: ["maintainer"],
-	},
+  { email: "ernest@example.com" },
+  {
+    name: "Ernest Hayford",
+    email: "ernest@example.com",
+    tags: ["maintainer"],
+  },
 );
 
 await Users.findByIdAndDelete(created._id);
@@ -254,11 +249,11 @@ await Users.deleteMany({ tags: { $in: ["inactive"] } });
 
 ```ts
 Users.pre("insertOne", ({ payload }) => {
-	console.log("About to insert", payload);
+  console.log("About to insert", payload);
 });
 
 Users.post("insertOne", ({ result }) => {
-	console.log("Inserted", result);
+  console.log("Inserted", result);
 });
 ```
 
@@ -278,8 +273,8 @@ const all = await Users.countDocuments({}, { withDeleted: true });
 await Users.restoreOne({ email: "a@example.com" });
 
 const page = await Users.paginate(
-	{ tags: { $in: ["admin"] } },
-	{ page: 1, pageSize: 20, sort: { createdAt: -1 } },
+  { tags: { $in: ["admin"] } },
+  { page: 1, pageSize: 20, sort: { createdAt: -1 } },
 );
 
 console.log(active, all, page.meta);
@@ -289,25 +284,22 @@ console.log(active, all, page.meta);
 
 ```ts
 const Books = model({
-	name: "books",
-	schema: z.object({
-		title: z.string(),
-		authorId: z.instanceof(ObjectID),
-	}),
-	options: {
-		refs: {
-			authorId: {
+  name: "books",
+  schema: z.object({
+    title: z.string(),
+    authorId: z.instanceof(ObjectID),
+  }),
+  options: {
+    refs: {
+      authorId: {
         field: "author",
-				collection: "authors",
-			},
-		},
-	},
+        collection: "authors",
+      },
+    },
+  },
 });
 
-const book = await Books.findOne(
-	{ title: "DX Patterns" },
-	{ populate: "authorId" },
-);
+const book = await Books.findOne({ title: "DX Patterns" }, { populate: "authorId" });
 ```
 
 ### Counts, Existence, Distinct
@@ -324,9 +316,9 @@ console.log(total, hasAdmins, uniqueTags);
 
 ```ts
 const tagStats = await Users.aggregate<{ _id: string; count: number }>([
-	{ $unwind: "$tags" },
-	{ $group: { _id: "$tags", count: { $sum: 1 } } },
-	{ $sort: { count: -1 } },
+  { $unwind: "$tags" },
+  { $group: { _id: "$tags", count: { $sum: 1 } } },
+  { $sort: { count: -1 } },
 ]);
 
 console.log(tagStats);
@@ -340,17 +332,17 @@ omymongo throws focused errors with codes for safer handling.
 import { CollectionError, ConnectionError, ValidationError } from "omymongo";
 
 try {
-	await Users.insertOne({ name: "A", email: "a@example.com", tags: [] });
+  await Users.insertOne({ name: "A", email: "a@example.com", tags: [] });
 } catch (error) {
-	if (error instanceof CollectionError) {
-		console.error("Collection operation failed", error.message);
-	} else if (error instanceof ConnectionError) {
-		console.error("Connection failed", error.message);
-	} else if (error instanceof ValidationError) {
-		console.error("Validation failed", error.message);
-	} else {
-		console.error("Unexpected error", error);
-	}
+  if (error instanceof CollectionError) {
+    console.error("Collection operation failed", error.message);
+  } else if (error instanceof ConnectionError) {
+    console.error("Connection failed", error.message);
+  } else if (error instanceof ValidationError) {
+    console.error("Validation failed", error.message);
+  } else {
+    console.error("Unexpected error", error);
+  }
 }
 ```
 

@@ -60,9 +60,7 @@ const IndexedCollection = createCollection({
 });
 
 const listIndexes = async (name: string) =>
-  connection.withLifetime(async (client) =>
-    client.db().collection(name).listIndexes().toArray()
-  );
+  connection.withLifetime(async (client) => client.db().collection(name).listIndexes().toArray());
 
 describe("should test collection functionality", () => {
   test.sequential("should support create, findById and find options", async () => {
@@ -142,10 +140,9 @@ describe("should test collection functionality", () => {
     );
     expect(updatedCount).toBe(2);
 
-    const updated = await TestCollection.findByIdAndUpdate(
-      docs[2]._id,
-      { $set: { questions: ["single-update"] } },
-    );
+    const updated = await TestCollection.findByIdAndUpdate(docs[2]._id, {
+      $set: { questions: ["single-update"] },
+    });
     expect(updated).not.toBeNull();
     expect(updated?.questions).toEqual(["single-update"]);
   });
@@ -216,20 +213,13 @@ describe("should test collection functionality", () => {
     expect(foundDoc).not.toBeNull();
     Logger.log("Found document:", foundDoc, doc._id);
     expect(foundDoc?._id).toEqual(doc._id);
-    expect(foundDoc?.questions).toEqual([
-      "What is MongoDB?",
-      "What is TypeScript?",
-    ]);
+    expect(foundDoc?.questions).toEqual(["What is MongoDB?", "What is TypeScript?"]);
 
     const updatedDoc = await TestCollection.updateOne(
       { _id: doc._id },
       {
         $set: {
-          questions: [
-            "What is MongoDB?",
-            "What is TypeScript?",
-            "What is Vite?",
-          ],
+          questions: ["What is MongoDB?", "What is TypeScript?", "What is Vite?"],
         },
       },
     );
@@ -261,27 +251,18 @@ describe("should test collection functionality", () => {
 
     const indexes = await listIndexes("indexed_test_collection");
 
-    expect(indexes.some((index) => index.name === "org_createdAt_compound"))
-      .toBe(true);
+    expect(indexes.some((index) => index.name === "org_createdAt_compound")).toBe(true);
+    expect(indexes.some((index) => index.name === "nickname_sparse" && index.sparse === true)).toBe(
+      true,
+    );
     expect(
-      indexes.some((index) =>
-        index.name === "nickname_sparse" && index.sparse === true
-      ),
-    ).toBe(true);
-    expect(
-      indexes.some((index) =>
-        index.name === "expires_at_ttl" && index.expireAfterSeconds === 0
-      ),
+      indexes.some((index) => index.name === "expires_at_ttl" && index.expireAfterSeconds === 0),
     ).toBe(true);
 
-    const compoundIndex = indexes.find((index) =>
-      index.name === "org_createdAt_compound"
-    );
+    const compoundIndex = indexes.find((index) => index.name === "org_createdAt_compound");
     expect(compoundIndex?.key).toEqual({ orgId: 1, createdAt: -1 });
 
-    const partialIndex = indexes.find((index) =>
-      index.name === "active_email_unique"
-    );
+    const partialIndex = indexes.find((index) => index.name === "active_email_unique");
     expect(partialIndex?.unique).toBe(true);
     expect(partialIndex?.partialFilterExpression).toEqual({ status: "active" });
   });

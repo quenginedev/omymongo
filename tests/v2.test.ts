@@ -54,9 +54,11 @@ const StrictCollection = createCollection({
 
 const SoftDeleteCollection = createCollection({
   name: "v2_soft_delete_collection",
-  schema: defineSchema(z.object({
-    title: z.string(),
-  })),
+  schema: defineSchema(
+    z.object({
+      title: z.string(),
+    }),
+  ),
 });
 
 SoftDeleteCollection.use(softDeletePlugin, { fieldName: "deletedAt" });
@@ -172,14 +174,9 @@ describe("v2 APIs", () => {
 
   test.sequential("should support chainable query builder", async () => {
     await SoftDeleteCollection.hardDeleteMany({});
-    await SoftDeleteCollection.insertMany([
-      { title: "B" },
-      { title: "A" },
-      { title: "C" },
-    ]);
+    await SoftDeleteCollection.insertMany([{ title: "B" }, { title: "A" }, { title: "C" }]);
 
-    const docs = await SoftDeleteCollection
-      .query({ title: { $in: ["A", "B", "C"] } })
+    const docs = await SoftDeleteCollection.query({ title: { $in: ["A", "B", "C"] } })
       .sort({ title: 1 })
       .limit(2)
       .exec();
@@ -199,9 +196,12 @@ describe("v2 APIs", () => {
     expect(deleted).not.toBeNull();
 
     const activeCount = await SoftDeleteCollection.countDocuments();
-    const allCount = await SoftDeleteCollection.countDocuments({}, {
-      withDeleted: true,
-    });
+    const allCount = await SoftDeleteCollection.countDocuments(
+      {},
+      {
+        withDeleted: true,
+      },
+    );
     expect(activeCount).toBe(1);
     expect(allCount).toBe(2);
 
@@ -212,10 +212,7 @@ describe("v2 APIs", () => {
     expect(afterRestore).toBe(2);
 
     await SoftDeleteCollection.findByIdAndDelete(first._id);
-    const withDeleted = await SoftDeleteCollection.exists(
-      { title: "keep" },
-      { withDeleted: true },
-    );
+    const withDeleted = await SoftDeleteCollection.exists({ title: "keep" }, { withDeleted: true });
     expect(withDeleted).toBe(true);
   });
 
@@ -255,10 +252,7 @@ describe("v2 APIs", () => {
       authorId: author._id,
     });
 
-    const found = await BookCollection.findOne(
-      { title: "DX Patterns" },
-      { populate: "authorId" },
-    );
+    const found = await BookCollection.findOne({ title: "DX Patterns" }, { populate: "authorId" });
 
     expect(found).not.toBeNull();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -274,8 +268,7 @@ describe("v2 APIs", () => {
       { name: "Cara", score: 88, tags: ["edge"] },
     ]);
 
-    const docs = await FluentCollection
-      .findFluent()
+    const docs = await FluentCollection.findFluent()
       .where("name")
       .in(["Ada", "Cara"])
       .sort({ score: -1 })
@@ -295,19 +288,12 @@ describe("v2 APIs", () => {
       { name: "Ola", score: 96, tags: ["beta"] },
     ]);
 
-    const topMid = await FluentCollection
-      .where("score")
-      .gte(80)
-      .lt(95)
-      .sort({ score: -1 })
-      .first();
+    const topMid = await FluentCollection.where("score").gte(80).lt(95).sort({ score: -1 }).first();
 
     expect(topMid).not.toBeNull();
     expect(topMid?.name).toBe("Noah");
 
-    const single = await FluentCollection
-      .findOneFluent({ tags: { $in: ["beta"] } })
-      .execOne();
+    const single = await FluentCollection.findOneFluent({ tags: { $in: ["beta"] } }).execOne();
 
     expect(single).not.toBeNull();
     expect(single?.name).toBe("Ola");
@@ -354,24 +340,15 @@ describe("v2 APIs", () => {
       { name: "Cara", score: 88, tags: ["core", "edge"] },
     ]);
 
-    const regexMatch = await FluentCollection
-      .findFluent()
-      .where("name")
-      .regex(/^a/i)
-      .execMany();
+    const regexMatch = await FluentCollection.findFluent().where("name").regex(/^a/i).execMany();
     expect(regexMatch.length).toBe(1);
     expect(regexMatch[0].name).toBe("Ada");
 
-    const hasNoBio = await FluentCollection
-      .findFluent()
-      .where("bio")
-      .exists(false)
-      .execMany();
+    const hasNoBio = await FluentCollection.findFluent().where("bio").exists(false).execMany();
     expect(hasNoBio.length).toBe(1);
     expect(hasNoBio[0].name).toBe("Cara");
 
-    const twoTags = await FluentCollection
-      .findFluent()
+    const twoTags = await FluentCollection.findFluent()
       .where("tags")
       .size(2)
       .sort({ score: -1 })
@@ -380,10 +357,7 @@ describe("v2 APIs", () => {
     expect(twoTags[0].name).toBe("Ada");
     expect(twoTags[1].name).toBe("Cara");
 
-    const textMatch = await FluentCollection
-      .findFluent()
-      .text("platform")
-      .execMany();
+    const textMatch = await FluentCollection.findFluent().text("platform").execMany();
     expect(textMatch.length).toBe(1);
     expect(textMatch[0].name).toBe("Ada");
   });
@@ -392,15 +366,9 @@ describe("v2 APIs", () => {
     await TransactionCollection.hardDeleteMany({});
 
     await withSession(async ({ session }) => {
-      await TransactionCollection.insertOne(
-        { key: "session", value: 1 },
-        { session },
-      );
+      await TransactionCollection.insertOne({ key: "session", value: 1 }, { session });
 
-      const found = await TransactionCollection.findOne(
-        { key: "session" },
-        { session },
-      );
+      const found = await TransactionCollection.findOne({ key: "session" }, { session });
 
       expect(found).not.toBeNull();
       expect(found?.value).toBe(1);
@@ -416,10 +384,7 @@ describe("v2 APIs", () => {
     await TransactionCollection.hardDeleteMany({});
 
     await withTransaction(async ({ session }) => {
-      await TransactionCollection.insertOne(
-        { key: "tx-commit", value: 10 },
-        { session },
-      );
+      await TransactionCollection.insertOne({ key: "tx-commit", value: 10 }, { session });
 
       await TransactionCollection.updateOne(
         { key: "tx-commit" },
@@ -440,10 +405,7 @@ describe("v2 APIs", () => {
 
     await expect(
       withTransaction(async ({ session }) => {
-        await TransactionCollection.insertOne(
-          { key: "tx-rollback", value: 5 },
-          { session },
-        );
+        await TransactionCollection.insertOne({ key: "tx-rollback", value: 5 }, { session });
 
         throw new Error("force rollback");
       }),

@@ -8,6 +8,7 @@ import type {
 import { MongoClient } from "mongodb";
 import type { ClientSession } from "mongodb";
 import { OmyMongoError } from "./errors.ts";
+import { Logger } from "./logger.ts";
 
 export class ConnectionError extends OmyMongoError {
   constructor(message: string) {
@@ -73,6 +74,7 @@ export class Connection {
       this.connection_counter = 0;
       console.log("Disconnected from MongoDB successfully!");
     } catch (error) {
+      Logger.error("Failed to disconnect from MongoDB:", error);
       throw new ConnectionError("Failed to disconnect from MongoDB");
     }
   }
@@ -92,13 +94,12 @@ export class Connection {
       return this.client!.startSession();
     } catch (error) {
       await this.disconnect();
+      Logger.error("Failed to start MongoDB session:", error);
       throw new ConnectionError("Failed to start MongoDB session");
     }
   }
 
-  async withSession<T>(
-    fn: (context: SessionContext) => Promise<T>,
-  ): Promise<T> {
+  async withSession<T>(fn: (context: SessionContext) => Promise<T>): Promise<T> {
     const session = await this.startSession();
     try {
       return await fn({ session });
@@ -150,9 +151,7 @@ export const startSession = async () => {
   return connection.startSession();
 };
 
-export const withSession = async <T>(
-  fn: (context: SessionContext) => Promise<T>,
-) => {
+export const withSession = async <T>(fn: (context: SessionContext) => Promise<T>) => {
   const connection = Connection.getInstance();
   return connection.withSession(fn);
 };

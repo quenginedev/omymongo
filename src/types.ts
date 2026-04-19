@@ -1,13 +1,13 @@
 import type z from "zod";
 import type {
+  AggregateOptions,
   ClientSession,
   Filter as MongoFilter,
-  UpdateFilter,
   FindOptions,
-  Sort,
-  AggregateOptions,
   OptionalUnlessRequiredId,
+  Sort,
   TransactionOptions,
+  UpdateFilter,
 } from "mongodb";
 
 export type ConnectionOptionsType = z.infer<typeof import("./schema.ts").ConnectionOptionsSchema>;
@@ -44,7 +44,8 @@ export type PopulateOption<Type> = keyof Type | Array<keyof Type>;
 
 export type AggregateQueryOptions = {
   maxTimeMS?: number;
-} & Pick<AggregateOptions, "allowDiskUse"> & SessionOperationOptions;
+} & Pick<AggregateOptions, "allowDiskUse"> &
+  SessionOperationOptions;
 
 export type UpdateOneOptions = {
   upsert?: boolean;
@@ -76,12 +77,12 @@ export type PaginationOptions<Type> = QueryOptions<Type> & {
   pageSize?: number;
 };
 
-export type PluginContext<Type> = {
+export type PluginContext = {
   enableSoftDelete: (fieldName?: string) => void;
 };
 
 export type CollectionPlugin<Type, Options = void> = (
   collection: import("./collection.ts").Collection<Type>,
   options: Options,
-  context: PluginContext<Type>,
+  context: PluginContext,
 ) => void;
