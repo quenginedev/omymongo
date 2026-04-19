@@ -179,7 +179,10 @@ export class Collection<Type> {
     const skip = (page - 1) * pageSize;
 
     const [total, data] = await Promise.all([
-      this.countDocuments(filter, { withDeleted: options?.withDeleted }),
+      this.countDocuments(filter, {
+        withDeleted: options?.withDeleted,
+        session: options?.session,
+      }),
       this.find(filter, {
         projection: options?.projection,
         sort: options?.sort,
@@ -187,6 +190,7 @@ export class Collection<Type> {
         limit: pageSize,
         withDeleted: options?.withDeleted,
         populate: options?.populate,
+        session: options?.session,
       }),
     ]);
 
