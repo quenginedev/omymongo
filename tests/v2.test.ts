@@ -404,6 +404,13 @@ describe("v2 APIs", () => {
 
       expect(found).not.toBeNull();
       expect(found?.value).toBe(1);
+
+      const page = await TransactionCollection.paginate(
+        { key: "session" },
+        { page: 1, pageSize: 1, session },
+      );
+      expect(page.meta.total).toBe(1);
+      expect(page.data.length).toBe(1);
     });
 
     const persisted = await TransactionCollection.findOne({ key: "session" });
