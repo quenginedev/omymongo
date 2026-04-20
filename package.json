@@ -1,6 +1,6 @@
 {
   "name": "omymongo",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "TypeScript-first MongoDB toolkit with Zod validation and fluent model APIs.",
   "keywords": [
     "mongodb",
