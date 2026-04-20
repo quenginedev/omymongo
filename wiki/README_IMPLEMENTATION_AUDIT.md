@@ -47,8 +47,8 @@ Scope reviewed: README.md vs all runtime implementation in src/ and behavior cov
 
 - "Zod validates on every write and full-document read"
   - Reads: behavior matches README (`skipValidation`/projection/lean skip validation; full document reads validate).
-  - Writes: `insert/create/replace` validate full payloads and `updateOne/updateMany` validate `$set` payloads.
-  - Remaining gap: non-`$set` update operators are not schema-validated as full write payloads.
+  - Writes: `insert/create/replace` validate full payloads and `updateOne/updateMany` validate supported update operators via `validateUpdateOperators()` (including `$set`, `$inc`, `$setOnInsert`, and other operators covered there).
+  - Remaining gap: update operators not covered by `validateUpdateOperators()` are not schema-validated as full write payloads.
 - "Zero abstraction leakage / 1:1 native calls"
   - Operations map to MongoDB calls, but extra behavior exists (validation, hooks, soft-delete filter scoping, populate), so this is not strict 1:1 behavior.
 
