@@ -71,9 +71,31 @@ jobs:
           git push --set-upstream origin "$BRANCH_NAME"
           echo "branch_name=$BRANCH_NAME" >> "$GITHUB_OUTPUT"
 
-      - name: Publish to npm
-        run: pnpm publish --access public
-      - name: Summary
+      - name: Create and push tag
+        id: tag
         run: |
-          echo "Created branch: ${{ steps.release_branch.outputs.branch_name }}"
-          echo "Published version: v${{ steps.bump.outputs.new_version }}"
+          TAG_NAME="v${{ steps.bump.outputs.new_version }}"
+          git tag "$TAG_NAME"
+          git push origin "$TAG_NAME"
+          echo "tag_name=$TAG_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag_name }}
+          name: Release ${{ steps.tag.outputs.tag_name }}
+          generate_release_notes: true
+
+      - name: Publish to npm
+        run: pnpm publish --access public --no-git-checks
+
+      - name: Open PR to sync version back to main
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          base: main
+          branch: ${{ steps.release_branch.outputs.branch_name }}
+          title: "chore(release): merge ${{ steps.release_branch.outputs.branch_name }} into main"
+          body: |
+            This PR syncs the released version bump back to main.
+            Released version: v${{ steps.bump.outputs.new_version }}
