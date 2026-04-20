@@ -4,7 +4,7 @@ import dts from "vite-plugin-dts";
 export default defineConfig({
   plugins: [dts({ insertTypesEntry: true })],
   test: { globalSetup: ["scripts/setupIntegrationTests.ts"] },
-  staged: { "**/*.ts": "pnpm check --fix" },
+  staged: { "**/*.{ts,yml,js,json}": "pnpm check --fix" },
   pack: { dts: { tsgo: true }, exports: true },
   lint: {
     options: {
