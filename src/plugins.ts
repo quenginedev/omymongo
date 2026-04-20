@@ -1,19 +1,22 @@
+import type { PaginationPluginOptions, PluginContext } from "./types.ts";
+import type { Collection } from "./collection.ts";
 export type SoftDeletePluginOptions = {
   fieldName?: string;
 };
 
 export const softDeletePlugin = <Type>(
-  collection: import("./collection.ts").Collection<Type>,
-  options?: SoftDeletePluginOptions,
-  context?: { enableSoftDelete: (fieldName?: string) => void },
+  collection: Collection<Type>,
+  options: SoftDeletePluginOptions,
+  context: PluginContext,
 ) => {
   const fieldName = options?.fieldName ?? "deletedAt";
-  context?.enableSoftDelete(fieldName);
-  if (!context) {
-    collection.enableSoftDelete(fieldName);
-  }
+  context.enableSoftDelete(fieldName);
 };
 
-export const paginationPlugin = <Type>(_collection: import("./collection.ts").Collection<Type>) => {
-  // Pagination is implemented directly on the collection API as paginate().
+export const paginationPlugin = <Type>(
+  collection: Collection<Type>,
+  options: PaginationPluginOptions | void,
+  context: PluginContext,
+) => {
+  context.enablePagination(options ?? undefined);
 };

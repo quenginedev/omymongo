@@ -38,6 +38,9 @@ describe("index.ts", () => {
     expect(connection.connection_counter).toBe(0);
     const results = await TestCollection.find({ questions: { $exists: true } });
     expect(Array.isArray(results)).toBe(true);
+    expect(connection.connection_counter).toBe(1);
+
+    await connection.disconnect();
     expect(connection.connection_counter).toBe(0);
   });
 });

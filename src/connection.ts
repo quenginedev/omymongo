@@ -51,8 +51,10 @@ export class Connection {
     });
 
     try {
-      if (this.connection_counter < 1) await this.client.connect();
-      this.connection_counter++;
+      if (this.connection_counter >= 1) return;
+
+      await this.client.connect();
+      this.connection_counter = 1;
       console.log("Connected to MongoDB successfully!");
     } catch (error) {
       console.error("Failed to connect to MongoDB:", error);
@@ -62,12 +64,7 @@ export class Connection {
 
   async disconnect() {
     try {
-      if (!this.client) return;
-
-      if (this.connection_counter > 1) {
-        this.connection_counter--;
-        return;
-      }
+      if (!this.client || this.connection_counter < 1) return;
 
       await this.client.close();
       this.client = null;
@@ -81,11 +78,7 @@ export class Connection {
 
   async withLifetime<T>(fn: (client: MongoClient) => Promise<T>): Promise<T> {
     await this.connect();
-    try {
-      return await fn(this.client!);
-    } finally {
-      await this.disconnect();
-    }
+    return await fn(this.client!);
   }
 
   async startSession(): Promise<ClientSession> {
@@ -106,7 +99,6 @@ export class Connection {
       return await fn({ session });
     } finally {
       await session.endSession();
-      await this.disconnect();
     }
   }
 

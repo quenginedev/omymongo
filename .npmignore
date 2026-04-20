@@ -1,2 +1,7 @@
 src
 tests
+wiki
+package.json
+tsconfig.json
+.npmignore
+.gitignore

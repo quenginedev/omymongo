@@ -1,6 +1,21 @@
 # omymongo
 
-A TypeScript-first MongoDB toolkit inspired by Mongoose DX, powered by Zod validation and the official MongoDB driver.
+A predictable, TypeScript-first MongoDB ODM. Mongoose ergonomics without the quirks.
+
+> Built for teams that want Prisma-level type confidence with MongoDB's full flexibility.
+
+## TL;DR
+
+```text
+Why omymongo?
+
+- No silent casting       (unlike Mongoose)
+- Fully inferred types    (no schema duplication)
+- Deterministic hooks     (no surprises)
+- Zero abstraction leakage — what you write is what Mongo executes
+
+→ Use it if you want Mongoose DX without Mongoose behavior
+```
 
 ## Inspiration
 
@@ -15,15 +30,51 @@ The goal: keep MongoDB close to native behavior while giving you safer defaults 
 
 ## Why This Library
 
-MongoDB projects often force a trade-off between convenience and control. omymongo aims to give you both.
+MongoDB projects often force a trade-off between convenience and control. omymongo gives you both — without the footguns.
 
-- Type-safe filters and updates
-- Runtime validation with Zod schemas
-- Fluent query layer for expressive chaining
-- Plugins, hooks, and soft-delete workflows
-- Minimal abstraction over the official MongoDB driver
+- **No silent type casting** — Zod validates full-document writes and full-document reads; update validation applies to supported update operators. Bad data throws, it doesn't slip through. Projection and lean queries intentionally skip validation.
+- **Fully inferred types without duplication** — define your schema once, get filter, update, and return types for free
+- **Deterministic middleware** — pre/post hooks run in registration order; all registered hooks execute in order even if one fails, then the operation aborts with the first hook error
+- **Fluent queries that stay type-safe** — chain `.where()`, `.sort()`, `.limit()` without losing autocomplete
+- **Close-to-native behavior** — operations map directly to native MongoDB driver calls while layering explicit validation, hooks, and soft-delete scoping
 
-Use omymongo if you want Mongoose-like ergonomics without losing direct MongoDB behavior.
+> **On validation overhead:** Zod runs on full-document reads and full-document writes; for updates, validation currently applies only to supported update operators, not lean/projection queries. Pass `{ skipValidation: true }` in read options to bypass validation on hot paths.
+
+Use omymongo if you've hit Mongoose's TypeScript limits or the native driver's verbosity.
+
+### Built with serverless in mind
+
+Mongoose struggles in Lambda and other short-lived runtimes. omymongo doesn't.
+
+- Safe connection reuse across invocations — no duplicate connection storms
+- No background processes or event emitters that block function shutdown
+- Predictable transaction lifecycle that works cleanly inside a single invocation
+
+If you're running MongoDB on AWS Lambda, Vercel, or Cloudflare Workers, this is worth your attention.
+
+### When NOT to use omymongo
+
+Honesty builds trust.
+
+- You need a battle-tested, large-ecosystem ODM today → use Mongoose
+- You rely heavily on existing Mongoose plugins or community middleware → stay on Mongoose
+- You want a fully managed ORM with migrations and a studio UI → use Prisma
+- You're building a large team project and need years of Stack Overflow coverage → native driver + Zod manually
+
+omymongo is the right call when you want control, type safety, and clean ergonomics — not when you need the widest ecosystem safety net.
+
+## omymongo vs Mongoose vs Native Driver
+
+| Feature             | omymongo                  | Mongoose                       | Native driver            |
+| ------------------- | ------------------------- | ------------------------------ | ------------------------ |
+| TypeScript-first    | ✅ Full inference         | ⚠️ Partial (requires generics) | ⚠️ Manual generics       |
+| Runtime validation  | ✅ Zod on every write     | ⚠️ Optional, schema-based      | ❌ None                  |
+| Silent type casting | ❌ Never                  | ✅ Yes (e.g. string → number)  | ❌ None                  |
+| Middleware hooks    | ✅ Deterministic pre/post | ⚠️ Async, can be non-obvious   | ❌ None                  |
+| Fluent query API    | ✅ Chainable, type-safe   | ⚠️ Chainable, loosely typed    | ❌ Manual filter objects |
+| Soft deletes        | ✅ Built-in plugin        | ❌ Manual                      | ❌ Manual                |
+| Pagination          | ✅ Built-in plugin        | ❌ Manual                      | ❌ Manual                |
+| Bundle size         | ✅ Lightweight            | ❌ Heavy                       | ✅ Lightweight           |
 
 ## Installation
 
@@ -61,7 +112,7 @@ await connect({
 const UserSchema = defineSchema(
   z.object({
     name: z.string(),
-    email: z.email(),
+    email: z.string().email(),
     tags: z.array(z.string()).default([]),
   }),
   { strict: "strip" },
@@ -286,10 +337,7 @@ console.log(active, all, page.meta);
 import { withSession, withTransaction } from "omymongo";
 
 await withTransaction(async ({ session }) => {
-  await Users.insertOne(
-    { name: "Nana", email: "nana@example.com", tags: ["trial"] },
-    { session },
-  );
+  await Users.insertOne({ name: "Nana", email: "nana@example.com", tags: ["trial"] }, { session });
 
   await Users.updateOne(
     { email: "nana@example.com" },
@@ -299,10 +347,7 @@ await withTransaction(async ({ session }) => {
 });
 
 await withSession(async ({ session }) => {
-  const user = await Users
-    .findFluent({ email: "nana@example.com" })
-    .session(session)
-    .execOne();
+  const user = await Users.findFluent({ email: "nana@example.com" }).session(session).execOne();
 
   console.log(user);
 });
@@ -327,6 +372,7 @@ const Books = model({
   },
 });
 
+// `author` field on the result holds the populated author document; `authorId` retains the original id value
 const book = await Books.findOne({ title: "DX Patterns" }, { populate: "authorId" });
 ```
 
@@ -400,8 +446,6 @@ Detailed milestone board: see [ROADMAP.md](./ROADMAP.md).
 
 Planned improvements include:
 
-- Richer index definitions (compound, unique, TTL, partial)
-- Transactions and sessions helpers
 - Better projection output typing for fluent selects
 - Realtime pub/sub to stream document changes over WebSocket or third-party brokers
 - Automatic document migration for drifted records when schema evolves

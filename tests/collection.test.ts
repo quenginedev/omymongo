@@ -1,8 +1,9 @@
 import { describe, expect, test } from "vite-plus/test";
 
-import { createCollection, createConnection } from "../src/index";
+import { createCollection, createConnection, ValidationError } from "../src/index";
 import z from "zod";
 import { Logger } from "../src/logger";
+import { ObjectId } from "mongodb";
 
 const connection = createConnection({
   uri: "mongodb://localhost:27017/testdb",
@@ -289,5 +290,99 @@ describe("should test collection functionality", () => {
         email: "same@example.com",
       }),
     ).rejects.toThrow();
+  });
+
+  test.sequential("should validate update $set payloads", async () => {
+    await TestCollection.deleteMany({});
+
+    const doc = await TestCollection.insertOne({
+      questions: ["q1"],
+    });
+
+    await expect(
+      TestCollection.updateOne({ _id: doc._id }, { $set: { questions: 1 as unknown as string[] } }),
+    ).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  test.sequential("should validate update $inc payloads", async () => {
+    await TestCollection.deleteMany({});
+
+    const doc = await TestCollection.insertOne({
+      questions: ["q1"],
+    });
+
+    await expect(
+      TestCollection.updateOne({ _id: doc._id }, { $inc: { questions: 1 as unknown as never } }),
+    ).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  test.sequential("should validate update $setOnInsert payloads", async () => {
+    await TestCollection.deleteMany({});
+
+    await expect(
+      TestCollection.updateOne(
+        { _id: new ObjectId() },
+        { $setOnInsert: { questions: 1 as unknown as string[] } },
+        { upsert: true },
+      ),
+    ).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  test.sequential("should run all hooks in registration order before throwing", async () => {
+    const HookCollection = createCollection({
+      name: "hook_test_collection",
+      schema: z.object({ questions: z.array(z.string()) }),
+    });
+
+    const order: string[] = [];
+    HookCollection.pre("insertOne", () => {
+      order.push("first");
+      throw new Error("first hook error");
+    });
+    HookCollection.pre("insertOne", () => {
+      order.push("second");
+    });
+
+    await expect(HookCollection.insertOne({ questions: ["x"] })).rejects.toThrow();
+    expect(order).toEqual(["first", "second"]);
+  });
+
+  test.sequential("should populate into alias field when ref.field is provided", async () => {
+    const Authors = createCollection({
+      name: "authors_test_collection",
+      schema: z.object({ name: z.string() }),
+    });
+
+    const Books = createCollection({
+      name: "books_test_collection",
+      schema: z.object({
+        title: z.string(),
+        authorId: z.instanceof(ObjectId),
+      }),
+      options: {
+        refs: {
+          authorId: {
+            field: "author",
+            collection: "authors_test_collection",
+          },
+        },
+      },
+    });
+
+    await Authors.deleteMany({});
+    await Books.deleteMany({});
+
+    const author = await Authors.insertOne({ name: "Ada" });
+    await Books.insertOne({ title: "Patterns", authorId: author._id });
+
+    const book = await Books.findOne({ title: "Patterns" }, { populate: "authorId" });
+    expect(book).not.toBeNull();
+    expect((book as unknown as Record<string, unknown>).authorId).toEqual(author._id);
+    const populated = (book as unknown as Record<string, unknown>).author as Record<
+      string,
+      unknown
+    > | null;
+    expect(populated).not.toBeNull();
+    expect(populated?.name).toBe("Ada");
   });
 });

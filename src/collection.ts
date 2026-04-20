@@ -3,7 +3,7 @@ import type {
   IndexDescription,
   OptionalUnlessRequiredId,
 } from "mongodb";
-import type z from "zod";
+import z from "zod";
 import { Connection } from "./connection.ts";
 import { OmyMongoError, ValidationError } from "./errors.ts";
 import { Logger } from "./logger.ts";
@@ -103,6 +103,7 @@ export class Collection<Type> {
   private postHooks: Map<CollectionOperation, HookHandler<Type>[]> = new Map();
   private schemaDefinition: SchemaDefinition<Type> | null = null;
   private softDeleteField: string | null = null;
+  private paginationConfig: { defaultPageSize: number; maxPageSize: number } | null = null;
 
   constructor(
     private name: string,
@@ -139,6 +140,7 @@ export class Collection<Type> {
   use<Options = void>(plugin: CollectionPlugin<Type, Options>, options?: Options): this {
     const context: PluginContext = {
       enableSoftDelete: (fieldName?: string) => this.enableSoftDelete(fieldName),
+      enablePagination: (pluginOptions) => this.enablePagination(pluginOptions),
     };
 
     plugin(this, options as Options, context);
@@ -147,6 +149,12 @@ export class Collection<Type> {
 
   enableSoftDelete(fieldName = "deletedAt") {
     this.softDeleteField = fieldName;
+  }
+
+  enablePagination(options?: { defaultPageSize?: number; maxPageSize?: number }) {
+    const defaultPageSize = Math.max(1, options?.defaultPageSize ?? 10);
+    const maxPageSize = Math.max(defaultPageSize, options?.maxPageSize ?? 100);
+    this.paginationConfig = { defaultPageSize, maxPageSize };
   }
 
   query(filter: Filter<Type> = {} as Filter<Type>) {
@@ -175,7 +183,9 @@ export class Collection<Type> {
     options?: PaginationOptions<Type>,
   ): Promise<PaginationResult<Type>> {
     const page = Math.max(1, options?.page ?? 1);
-    const pageSize = Math.max(1, options?.pageSize ?? 10);
+    const defaultPageSize = this.paginationConfig?.defaultPageSize ?? 10;
+    const maxPageSize = this.paginationConfig?.maxPageSize ?? Number.POSITIVE_INFINITY;
+    const pageSize = Math.min(maxPageSize, Math.max(1, options?.pageSize ?? defaultPageSize));
     const skip = (page - 1) * pageSize;
 
     const [total, data] = await Promise.all([
@@ -190,6 +200,7 @@ export class Collection<Type> {
         limit: pageSize,
         withDeleted: options?.withDeleted,
         populate: options?.populate,
+        skipValidation: options?.skipValidation,
         session: options?.session,
       }),
     ]);
@@ -399,9 +410,10 @@ export class Collection<Type> {
       });
     });
     if (!response) return null;
-    const rawResult = options?.projection
-      ? (response as Document<Type>)
-      : this.validateDocument(response);
+    const rawResult =
+      options?.projection || options?.skipValidation
+        ? (response as Document<Type>)
+        : this.validateDocument(response);
     if (!rawResult) return null;
     const [result] = await this.populateDocuments([rawResult], options?.populate, options);
     await this.runHooks("post", {
@@ -445,7 +457,11 @@ export class Collection<Type> {
     });
 
     const validated = response
-      .map((doc) => this.validateDocument(doc))
+      .map((doc) =>
+        options?.projection || options?.skipValidation
+          ? (doc as Document<Type>)
+          : this.validateDocument(doc),
+      )
       .filter((doc): doc is Document<Type> => doc !== null);
     const result = await this.populateDocuments(validated, options?.populate, options);
 
@@ -527,6 +543,8 @@ export class Collection<Type> {
       payload: update,
     });
 
+    this.validateUpdateOperators(update);
+
     const response = await this.connection.withLifetime(async (client) => {
       const db = client.db();
       const collection = db.collection<Document<Type>>(this.name);
@@ -579,6 +597,8 @@ export class Collection<Type> {
       filter: scopedFilter,
       payload: update,
     });
+
+    this.validateUpdateOperators(update);
 
     const response = await this.connection.withLifetime(async (client) => {
       const db = client.db();
@@ -830,6 +850,36 @@ export class Collection<Type> {
     return parsed.data as Document<Type>;
   }
 
+  private parsePartialWrite(data: unknown, operator = "$set"): Partial<Type> {
+    try {
+      const targetSchema = this.schemaDefinition?.schema ?? this.schema;
+      if (targetSchema instanceof z.ZodObject) {
+        return targetSchema.partial().parse(data) as Partial<Type>;
+      }
+      // For non-object schemas, validate as-is
+      return targetSchema.parse(data) as Partial<Type>;
+    } catch (error) {
+      throw new ValidationError(`Update ${operator} validation failed`, error);
+    }
+  }
+
+  private validateUpdateOperators(update: Update<Type>): void {
+    const operators: Array<"$set" | "$setOnInsert" | "$inc" | "$mul" | "$min" | "$max"> = [
+      "$set",
+      "$setOnInsert",
+      "$inc",
+      "$mul",
+      "$min",
+      "$max",
+    ];
+
+    for (const operator of operators) {
+      const payload = update[operator];
+      if (!payload) continue;
+      this.parsePartialWrite(payload, operator);
+    }
+  }
+
   private parseWrite(document: unknown): Type {
     try {
       if (this.schemaDefinition) {
@@ -930,6 +980,8 @@ export class Collection<Type> {
 
       const targetCollectionName = ref.collection ?? ref.field;
       const foreignField = ref.foreignField ?? "_id";
+      // When collection is provided separately, field acts as an output alias key.
+      const outputKey = ref.collection ? ref.field : fieldName;
       const values: unknown[] = [];
 
       for (const doc of docs) {
@@ -976,14 +1028,14 @@ export class Collection<Type> {
       for (const targetDoc of targetDocs) {
         const keySource = targetDoc[foreignField] as unknown;
         if (keySource === undefined || keySource === null) continue;
-        map.set(String(keySource), targetDoc);
+        map.set(this.serializePopulateKey(keySource), targetDoc);
       }
 
       for (const doc of docs) {
         const current = (doc as Record<string, unknown>)[fieldName];
         if (Array.isArray(current)) {
-          (doc as Record<string, unknown>)[fieldName] = current
-            .map((value) => map.get(String(value)))
+          (doc as Record<string, unknown>)[outputKey] = current
+            .map((value) => map.get(this.serializePopulateKey(value)))
             .filter(Boolean);
           continue;
         }
@@ -992,27 +1044,52 @@ export class Collection<Type> {
           continue;
         }
 
-        (doc as Record<string, unknown>)[fieldName] = map.get(String(current)) ?? null;
+        (doc as Record<string, unknown>)[outputKey] =
+          map.get(this.serializePopulateKey(current)) ?? null;
       }
     }
 
     return docs;
   }
 
+  private serializePopulateKey(value: unknown): string {
+    if (value instanceof Date) {
+      return value.toISOString();
+    }
+
+    if (typeof value === "object" && value !== null) {
+      try {
+        return JSON.stringify(value);
+      } catch {
+        return "[unserializable-object]";
+      }
+    }
+
+    return String(value);
+  }
+
   private async runHooks(phase: "pre" | "post", context: HookContext<Type>) {
     const store = phase === "pre" ? this.preHooks : this.postHooks;
     const handlers = store.get(context.operation) ?? [];
 
+    let firstError: unknown = null;
     for (const handler of handlers) {
       try {
         await handler(context);
       } catch (error) {
-        throw new OmyMongoError(
-          "COLLECTION_ERROR",
-          `Collection ${phase} hook failed for ${context.operation}`,
-          error,
-        );
+        // Run all hooks deterministically even if one fails.
+        if (firstError === null) {
+          firstError = error;
+        }
       }
+    }
+
+    if (firstError !== null) {
+      throw new OmyMongoError(
+        "COLLECTION_ERROR",
+        `Collection ${phase} hook failed for ${context.operation}`,
+        firstError,
+      );
     }
   }
 }
@@ -1021,18 +1098,26 @@ type CollectionOptions<Type> = {
   connection?: Connection;
   refs?: ReferenceMap<Type>;
   indexes?: CollectionIndexes<Type>;
+  plugins?: CollectionPlugin<Type, unknown>[];
 };
 
 export const createCollection = <Type extends unknown>(options: {
   name: string;
   schema: z.ZodSchema<Type> | SchemaDefinition<Type>;
   options?: CollectionOptions<Type>;
-}) =>
-  new Collection<Type>(options.name, options.schema, {
+}) => {
+  const collection = new Collection<Type>(options.name, options.schema, {
     connection: options.options?.connection,
     refs: options.options?.refs,
     indexes: options.options?.indexes,
   });
+
+  for (const plugin of options.options?.plugins ?? []) {
+    collection.use(plugin);
+  }
+
+  return collection;
+};
 
 export const model = createCollection;
 
@@ -1199,6 +1284,7 @@ export class CollectionQuery<Type> {
   }
 
   lean() {
+    this.options.skipValidation = true;
     return this;
   }
 

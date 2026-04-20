@@ -9,6 +9,7 @@ import type {
   TransactionOptions,
   UpdateFilter,
 } from "mongodb";
+import type { Collection } from "./collection.ts";
 
 export type ConnectionOptionsType = z.infer<typeof import("./schema.ts").ConnectionOptionsSchema>;
 export type ObjectId = z.infer<typeof import("./schema.ts").ObjectIdSchema>;
@@ -38,6 +39,7 @@ export type QueryOptions<Type> = {
   skip?: number;
   withDeleted?: boolean;
   populate?: PopulateOption<Type>;
+  skipValidation?: boolean;
 } & SessionOperationOptions;
 
 export type PopulateOption<Type> = keyof Type | Array<keyof Type>;
@@ -77,12 +79,18 @@ export type PaginationOptions<Type> = QueryOptions<Type> & {
   pageSize?: number;
 };
 
-export type PluginContext = {
-  enableSoftDelete: (fieldName?: string) => void;
+export type PaginationPluginOptions = {
+  defaultPageSize?: number;
+  maxPageSize?: number;
 };
 
-export type CollectionPlugin<Type, Options = void> = (
-  collection: import("./collection.ts").Collection<Type>,
+export type PluginContext = {
+  enableSoftDelete: (fieldName?: string) => void;
+  enablePagination: (options?: PaginationPluginOptions) => void;
+};
+
+export type CollectionPlugin<Type = unknown, Options = void> = (
+  collection: Collection<Type>,
   options: Options,
   context: PluginContext,
 ) => void;
