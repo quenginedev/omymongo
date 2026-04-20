@@ -65,15 +65,7 @@ jobs:
           echo "branch_name=$BRANCH_NAME" >> "$GITHUB_OUTPUT"
 
       - name: Publish to npm
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          if [ -z "$NODE_AUTH_TOKEN" ]; then
-            echo "NPM_TOKEN secret is not set."
-            exit 1
-          fi
-          pnpm publish --no-git-checks --access public
-
+        run: pnpm publish --access public
       - name: Summary
         run: |
           echo "Created branch: ${{ steps.release_branch.outputs.branch_name }}"
