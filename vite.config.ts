@@ -7,7 +7,7 @@ export default defineConfig({
     globalSetup: ["scripts/setupIntegrationTests.ts"],
   },
   staged: {
-    "**/*.ts": "pnpm check --fix",
+    "**/*.ts": "pnpm check --fix && pnpm test",
   },
   pack: {
     dts: {
