@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vite-plus/test";
+import { afterAll, describe, expect, test } from "vite-plus/test";
 import z from "zod";
 
 import {
@@ -14,16 +14,9 @@ import {
   withTransaction,
 } from "../src/index";
 
-await connect({
-  uri: "mongodb://localhost:27017/testdb",
-  appName: "TestAppV2",
-  maxPoolSize: 10,
-  minPoolSize: 0,
-});
-
 const connection = createConnection({
-  uri: "mongodb://localhost:27017/testdb",
-  appName: "TestAppV2",
+  uri: process.env.MONGO_URI!,
+  appName: "TestApp",
   maxPoolSize: 10,
   minPoolSize: 0,
 });
@@ -114,7 +107,7 @@ const supportsTransactions = async () => {
 };
 
 describe("v2 APIs", () => {
-  test.sequential("should strip unknown keys when strict mode is strip", async () => {
+  test("should strip unknown keys when strict mode is strip", async () => {
     await StripCollection.deleteMany({});
 
     const created = await StripCollection.create({
@@ -127,7 +120,7 @@ describe("v2 APIs", () => {
     expect((created as any).extra).toBeUndefined();
   });
 
-  test.sequential("should reject unknown keys when strict mode is strict", async () => {
+  test("should reject unknown keys when strict mode is strict", async () => {
     await StrictCollection.deleteMany({});
 
     await expect(
@@ -139,7 +132,7 @@ describe("v2 APIs", () => {
     ).rejects.toThrow();
   });
 
-  test.sequential("should run pre and post hooks", async () => {
+  test("should run pre and post hooks", async () => {
     await StripCollection.deleteMany({});
 
     let preCalled = 0;
@@ -159,7 +152,7 @@ describe("v2 APIs", () => {
     expect(postCalled).toBe(1);
   });
 
-  test.sequential("should expose connect and disconnect helpers", async () => {
+  test("should expose connect and disconnect helpers", async () => {
     await disconnect();
 
     const connection = await connect({
@@ -172,7 +165,7 @@ describe("v2 APIs", () => {
     expect(connection.connection_counter).toBeGreaterThan(0);
   });
 
-  test.sequential("should support chainable query builder", async () => {
+  test("should support chainable query builder", async () => {
     await SoftDeleteCollection.hardDeleteMany({});
     await SoftDeleteCollection.insertMany([{ title: "B" }, { title: "A" }, { title: "C" }]);
 
@@ -186,7 +179,7 @@ describe("v2 APIs", () => {
     expect(docs[1].title).toBe("B");
   });
 
-  test.sequential("should support soft delete and restore workflow", async () => {
+  test("should support soft delete and restore workflow", async () => {
     await SoftDeleteCollection.hardDeleteMany({});
 
     const first = await SoftDeleteCollection.create({ title: "keep" });
@@ -216,7 +209,7 @@ describe("v2 APIs", () => {
     expect(withDeleted).toBe(true);
   });
 
-  test.sequential("should support pagination helper", async () => {
+  test("should support pagination helper", async () => {
     await SoftDeleteCollection.hardDeleteMany({});
 
     await SoftDeleteCollection.insertMany([
@@ -242,7 +235,7 @@ describe("v2 APIs", () => {
     expect(page.meta.pageCount).toBe(3);
   });
 
-  test.sequential("should populate referenced documents", async () => {
+  test("should populate referenced documents", async () => {
     await BookCollection.hardDeleteMany({});
     await AuthorCollection.hardDeleteMany({});
 
@@ -259,7 +252,7 @@ describe("v2 APIs", () => {
     expect((found as any)?.authorId?.name).toBe("John");
   });
 
-  test.sequential("should support fluent where/equality and execMany", async () => {
+  test("should support fluent where/equality and execMany", async () => {
     await FluentCollection.hardDeleteMany({});
 
     await FluentCollection.insertMany([
@@ -279,7 +272,7 @@ describe("v2 APIs", () => {
     expect(docs[1].name).toBe("Cara");
   });
 
-  test.sequential("should support fluent range operators and first/execOne", async () => {
+  test("should support fluent range operators and first/execOne", async () => {
     await FluentCollection.hardDeleteMany({});
 
     await FluentCollection.insertMany([
@@ -299,7 +292,7 @@ describe("v2 APIs", () => {
     expect(single?.name).toBe("Ola");
   });
 
-  test.sequential("should support findByIdFluent with exec", async () => {
+  test("should support findByIdFluent with exec", async () => {
     await FluentCollection.hardDeleteMany({});
 
     const created = await FluentCollection.create({
@@ -314,7 +307,7 @@ describe("v2 APIs", () => {
     expect((byId as { name: string }).name).toBe("Zed");
   });
 
-  test.sequential("should support fluent regex, exists, size and text operators", async () => {
+  test("should support fluent regex, exists, size and text operators", async () => {
     await FluentCollection.hardDeleteMany({});
 
     await connection.withLifetime(async (client) => {
@@ -362,7 +355,7 @@ describe("v2 APIs", () => {
     expect(textMatch[0].name).toBe("Ada");
   });
 
-  test.sequential("should support session-bound operations", async () => {
+  test("should support session-bound operations", async () => {
     await TransactionCollection.hardDeleteMany({});
 
     await withSession(async ({ session }) => {
@@ -385,7 +378,7 @@ describe("v2 APIs", () => {
     expect(persisted).not.toBeNull();
   });
 
-  test.sequential("should commit transaction when callback succeeds", async () => {
+  test("should commit transaction when callback succeeds", async () => {
     if (!(await supportsTransactions())) return;
 
     await TransactionCollection.hardDeleteMany({});
@@ -405,7 +398,7 @@ describe("v2 APIs", () => {
     expect(found?.value).toBe(20);
   });
 
-  test.sequential("should rollback transaction when callback throws", async () => {
+  test("should rollback transaction when callback throws", async () => {
     if (!(await supportsTransactions())) return;
 
     await TransactionCollection.hardDeleteMany({});

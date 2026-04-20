@@ -1,12 +1,11 @@
-import { describe, expect, test } from "vite-plus/test";
-
-import { createCollection, createConnection, ValidationError } from "../src/index";
-import z from "zod";
-import { Logger } from "../src/logger";
 import { ObjectId } from "mongodb";
+import { describe, expect, test } from "vite-plus/test";
+import z from "zod";
+import { createCollection, createConnection, ValidationError } from "../src/index";
+import { Logger } from "../src/logger";
 
 const connection = createConnection({
-  uri: "mongodb://localhost:27017/testdb",
+  uri: process.env.MONGO_URI!,
   appName: "TestApp",
   maxPoolSize: 10,
   minPoolSize: 0,
@@ -64,7 +63,7 @@ const listIndexes = async (name: string) =>
   connection.withLifetime(async (client) => client.db().collection(name).listIndexes().toArray());
 
 describe("should test collection functionality", () => {
-  test.sequential("should support create, findById and find options", async () => {
+  test("should support create, findById and find options", async () => {
     await TestCollection.deleteMany({});
 
     const first = await TestCollection.create({
@@ -97,7 +96,7 @@ describe("should test collection functionality", () => {
     expect(projected?.questions.length).toBe(2);
   });
 
-  test.sequential("should support countDocuments, exists and distinct", async () => {
+  test("should support countDocuments, exists and distinct", async () => {
     await TestCollection.deleteMany({});
 
     await TestCollection.insertMany([
@@ -126,7 +125,7 @@ describe("should test collection functionality", () => {
     expect(distinct.includes("zod")).toBe(true);
   });
 
-  test.sequential("should support updateMany and findByIdAndUpdate", async () => {
+  test("should support updateMany and findByIdAndUpdate", async () => {
     await TestCollection.deleteMany({});
 
     const docs = await TestCollection.insertMany([
@@ -148,7 +147,7 @@ describe("should test collection functionality", () => {
     expect(updated?.questions).toEqual(["single-update"]);
   });
 
-  test.sequential("should support replaceOne and aggregate", async () => {
+  test("should support replaceOne and aggregate", async () => {
     await TestCollection.deleteMany({});
 
     await TestCollection.insertMany([
@@ -177,7 +176,7 @@ describe("should test collection functionality", () => {
     expect(typeof aggregation[0].count).toBe("number");
   });
 
-  test.sequential("should support deleteMany and findByIdAndDelete", async () => {
+  test("should support deleteMany and findByIdAndDelete", async () => {
     await TestCollection.deleteMany({});
 
     const docs = await TestCollection.insertMany([
@@ -201,7 +200,7 @@ describe("should test collection functionality", () => {
     expect(left).toBe(0);
   });
 
-  test.sequential("should insert and find documents", async () => {
+  test("should insert and find documents", async () => {
     await TestCollection.deleteMany({});
 
     const doc = await TestCollection.insertOne({
@@ -240,7 +239,7 @@ describe("should test collection functionality", () => {
     expect(shouldBeNull).toBeNull();
   });
 
-  test.sequential("should create compound, sparse, ttl and partial indexes", async () => {
+  test("should create compound, sparse, ttl and partial indexes", async () => {
     await IndexedCollection.deleteMany({});
     await IndexedCollection.insertOne({
       orgId: "org-1",
@@ -268,7 +267,7 @@ describe("should test collection functionality", () => {
     expect(partialIndex?.partialFilterExpression).toEqual({ status: "active" });
   });
 
-  test.sequential("should enforce partial unique indexes only for matching documents", async () => {
+  test("should enforce partial unique indexes only for matching documents", async () => {
     await IndexedCollection.deleteMany({});
 
     await IndexedCollection.insertOne({
@@ -292,7 +291,7 @@ describe("should test collection functionality", () => {
     ).rejects.toThrow();
   });
 
-  test.sequential("should validate update $set payloads", async () => {
+  test("should validate update $set payloads", async () => {
     await TestCollection.deleteMany({});
 
     const doc = await TestCollection.insertOne({
@@ -304,7 +303,7 @@ describe("should test collection functionality", () => {
     ).rejects.toBeInstanceOf(ValidationError);
   });
 
-  test.sequential("should validate update $inc payloads", async () => {
+  test("should validate update $inc payloads", async () => {
     await TestCollection.deleteMany({});
 
     const doc = await TestCollection.insertOne({
@@ -316,7 +315,7 @@ describe("should test collection functionality", () => {
     ).rejects.toBeInstanceOf(ValidationError);
   });
 
-  test.sequential("should validate update $setOnInsert payloads", async () => {
+  test("should validate update $setOnInsert payloads", async () => {
     await TestCollection.deleteMany({});
 
     await expect(
@@ -328,7 +327,7 @@ describe("should test collection functionality", () => {
     ).rejects.toBeInstanceOf(ValidationError);
   });
 
-  test.sequential("should run all hooks in registration order before throwing", async () => {
+  test("should run all hooks in registration order before throwing", async () => {
     const HookCollection = createCollection({
       name: "hook_test_collection",
       schema: z.object({ questions: z.array(z.string()) }),
@@ -347,7 +346,7 @@ describe("should test collection functionality", () => {
     expect(order).toEqual(["first", "second"]);
   });
 
-  test.sequential("should populate into alias field when ref.field is provided", async () => {
+  test("should populate into alias field when ref.field is provided", async () => {
     const Authors = createCollection({
       name: "authors_test_collection",
       schema: z.object({ name: z.string() }),
