@@ -58,10 +58,17 @@ jobs:
         id: release_branch
         run: |
           BRANCH_NAME="release/v${{ steps.bump.outputs.new_version }}"
+
+          if git ls-remote --exit-code --heads origin "$BRANCH_NAME" > /dev/null; then
+            echo "Release branch already exists on origin: $BRANCH_NAME"
+            echo "Pick another version bump (or delete/merge the existing release branch first)."
+            exit 1
+          fi
+
           git switch -c "$BRANCH_NAME"
           git add package.json
           git commit -m "chore(release): bump version to v${{ steps.bump.outputs.new_version }}"
-          git push origin "$BRANCH_NAME"
+          git push --set-upstream origin "$BRANCH_NAME"
           echo "branch_name=$BRANCH_NAME" >> "$GITHUB_OUTPUT"
 
       - name: Publish to npm
