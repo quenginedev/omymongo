@@ -18,6 +18,7 @@ permissions:
 
 jobs:
   release:
+    if: github.actor == 'quenginedev'
     name: Bump version, branch, and publish
     runs-on: ubuntu-latest
 
