@@ -51,10 +51,8 @@ export class Connection {
     });
 
     try {
-      if (this.connection_counter >= 1) return;
-
-      await this.client.connect();
-      this.connection_counter = 1;
+      if (this.connection_counter < 1) await this.client.connect();
+      this.connection_counter++;
       console.log("Connected to MongoDB successfully!");
     } catch (error) {
       console.error("Failed to connect to MongoDB:", error);
@@ -62,37 +60,33 @@ export class Connection {
     }
   }
 
-  async disconnect() {
+  async disconnect(options?: { all?: boolean }) {
     try {
+      Logger.log("Attempting to disconnect from MongoDB...", {
+        counter: this.connection_counter,
+      });
       if (!this.client || this.connection_counter < 1) return;
+
+      this.connection_counter = options?.all ? 0 : Math.max(0, this.connection_counter - 1);
+      Logger.log("Updated connection counter:", { counter: this.connection_counter });
+      if (this.connection_counter > 0) return;
 
       await this.client.close();
       this.client = null;
-      this.connection_counter = 0;
-      console.log("Disconnected from MongoDB successfully!");
+      Logger.log("Disconnected from MongoDB successfully!");
     } catch (error) {
       Logger.error("Failed to disconnect from MongoDB:", error);
       throw new ConnectionError("Failed to disconnect from MongoDB");
     }
   }
 
-  async closeAllConnections() {
-    try {
-      if (!this.client || this.connection_counter < 1) return;
-
-      await this.client.close();
-      this.client = null;
-      this.connection_counter = 0;
-      console.log("All MongoDB connections closed successfully!");
-    } catch (error) {
-      Logger.error("Failed to close all MongoDB connections:", error);
-      throw new ConnectionError("Failed to close all MongoDB connections");
-    }
-  }
-
   async withLifetime<T>(fn: (client: MongoClient) => Promise<T>): Promise<T> {
     await this.connect();
-    return await fn(this.client!);
+    try {
+      return await fn(this.client!);
+    } finally {
+      await this.disconnect();
+    }
   }
 
   async startSession(): Promise<ClientSession> {

@@ -7,7 +7,7 @@ const TestSchema = z.object({
 });
 
 describe("index.ts", () => {
-  test.sequential("should connect to MongoDB", async () => {
+  test("should connect to MongoDB", async () => {
     const connection = createConnection({
       uri: process.env.MONGO_URI!,
       appName: "TestApp",
@@ -22,7 +22,7 @@ describe("index.ts", () => {
     expect(connection.connection_counter).toBe(0);
   });
 
-  test.sequential("should run lifecycle methods correctly", async () => {
+  test("should run lifecycle methods correctly", async () => {
     const connection = createConnection({
       uri: process.env.MONGO_URI!,
       appName: "TestApp",
@@ -38,9 +38,8 @@ describe("index.ts", () => {
     expect(connection.connection_counter).toBe(0);
     const results = await TestCollection.find({ questions: { $exists: true } });
     expect(Array.isArray(results)).toBe(true);
-    expect(connection.connection_counter).toBe(1);
 
-    await connection.disconnect();
+    // Auto disconnected
     expect(connection.connection_counter).toBe(0);
   });
 });
