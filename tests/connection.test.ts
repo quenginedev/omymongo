@@ -1,6 +1,6 @@
-import { expect, test, describe } from "vite-plus/test";
-import { createConnection, createCollection } from "../src/index";
+import { describe, expect, test } from "vite-plus/test";
 import z from "zod";
+import { createCollection, createConnection } from "../src/index";
 
 const TestSchema = z.object({
   questions: z.array(z.string()),
@@ -9,7 +9,7 @@ const TestSchema = z.object({
 describe("index.ts", () => {
   test.sequential("should connect to MongoDB", async () => {
     const connection = createConnection({
-      uri: "mongodb://localhost:27017/testdb",
+      uri: process.env.MONGO_URI!,
       appName: "TestApp",
       maxPoolSize: 10,
       minPoolSize: 0,
@@ -24,7 +24,7 @@ describe("index.ts", () => {
 
   test.sequential("should run lifecycle methods correctly", async () => {
     const connection = createConnection({
-      uri: "mongodb://localhost:27017/testdb",
+      uri: process.env.MONGO_URI!,
       appName: "TestApp",
       maxPoolSize: 10,
       minPoolSize: 0,

@@ -1,15 +1,18 @@
-import { describe, expect, test } from "vite-plus/test";
-
-import { createCollection, createConnection, ValidationError } from "../src/index";
-import z from "zod";
-import { Logger } from "../src/logger";
 import { ObjectId } from "mongodb";
+import { afterAll, describe, expect, test } from "vite-plus/test";
+import z from "zod";
+import { createCollection, createConnection, ValidationError } from "../src/index";
+import { Logger } from "../src/logger";
 
 const connection = createConnection({
-  uri: "mongodb://localhost:27017/testdb",
+  uri: process.env.MONGO_URI!,
   appName: "TestApp",
   maxPoolSize: 10,
   minPoolSize: 0,
+});
+
+afterAll(async () => {
+  await connection.disconnect();
 });
 
 const TestSchema = z.object({

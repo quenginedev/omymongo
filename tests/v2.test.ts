@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vite-plus/test";
+import { afterAll, describe, expect, test } from "vite-plus/test";
 import z from "zod";
 
 import {
@@ -14,18 +14,15 @@ import {
   withTransaction,
 } from "../src/index";
 
-await connect({
-  uri: "mongodb://localhost:27017/testdb",
-  appName: "TestAppV2",
+const connection = createConnection({
+  uri: process.env.MONGO_URI!,
+  appName: "TestApp",
   maxPoolSize: 10,
   minPoolSize: 0,
 });
 
-const connection = createConnection({
-  uri: "mongodb://localhost:27017/testdb",
-  appName: "TestAppV2",
-  maxPoolSize: 10,
-  minPoolSize: 0,
+afterAll(async () => {
+  await connection.disconnect();
 });
 
 const StripSchema = defineSchema(
