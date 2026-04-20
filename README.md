@@ -32,13 +32,13 @@ The goal: keep MongoDB close to native behavior while giving you safer defaults 
 
 MongoDB projects often force a trade-off between convenience and control. omymongo gives you both — without the footguns.
 
-- **No silent type casting** — Zod validates on every write and every full-document read; bad data throws, it doesn't slip through. Projection and lean queries intentionally skip validation.
+- **No silent type casting** — Zod validates full-document writes and full-document reads; update validation applies to supported update operators. Bad data throws, it doesn't slip through. Projection and lean queries intentionally skip validation.
 - **Fully inferred types without duplication** — define your schema once, get filter, update, and return types for free
 - **Deterministic middleware** — pre/post hooks run in registration order; all registered hooks execute in order even if one fails, then the operation aborts with the first hook error
 - **Fluent queries that stay type-safe** — chain `.where()`, `.sort()`, `.limit()` without losing autocomplete
 - **Close-to-native behavior** — operations map directly to native MongoDB driver calls while layering explicit validation, hooks, and soft-delete scoping
 
-> **On validation overhead:** Zod runs only on full-document reads and writes, not on lean/projection queries. Pass `{ skipValidation: true }` in read options to bypass validation on hot paths.
+> **On validation overhead:** Zod runs on full-document reads and full-document writes; for updates, validation currently applies only to supported update operators, not lean/projection queries. Pass `{ skipValidation: true }` in read options to bypass validation on hot paths.
 
 Use omymongo if you've hit Mongoose's TypeScript limits or the native driver's verbosity.
 
