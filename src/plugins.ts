@@ -10,10 +10,7 @@ export const softDeletePlugin = <Type>(
   context: PluginContext,
 ) => {
   const fieldName = options?.fieldName ?? "deletedAt";
-  context?.enableSoftDelete(fieldName);
-  if (!context) {
-    collection.enableSoftDelete(fieldName);
-  }
+  context.enableSoftDelete(fieldName);
 };
 
 export const paginationPlugin = <Type>(
@@ -21,8 +18,5 @@ export const paginationPlugin = <Type>(
   options: PaginationPluginOptions | void,
   context: PluginContext,
 ) => {
-  context?.enablePagination(options ?? undefined);
-  if (!context) {
-    collection.enablePagination(options ?? undefined);
-  }
+  context.enablePagination(options ?? undefined);
 };

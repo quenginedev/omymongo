@@ -200,6 +200,7 @@ export class Collection<Type> {
         limit: pageSize,
         withDeleted: options?.withDeleted,
         populate: options?.populate,
+        skipValidation: options?.skipValidation,
         session: options?.session,
       }),
     ]);
@@ -1104,12 +1105,19 @@ export const createCollection = <Type extends unknown>(options: {
   name: string;
   schema: z.ZodSchema<Type> | SchemaDefinition<Type>;
   options?: CollectionOptions<Type>;
-}) =>
-  new Collection<Type>(options.name, options.schema, {
+}) => {
+  const collection = new Collection<Type>(options.name, options.schema, {
     connection: options.options?.connection,
     refs: options.options?.refs,
     indexes: options.options?.indexes,
   });
+
+  for (const plugin of options.options?.plugins ?? []) {
+    collection.use(plugin);
+  }
+
+  return collection;
+};
 
 export const model = createCollection;
 
