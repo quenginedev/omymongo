@@ -69,7 +69,7 @@ async function main() {
   await Users.deleteMany({});
   await Posts.hardDeleteMany({});
 
-  await disconnect();
+  await Connection.getInstance().disconnect({ all: true });
 }
 
 main().catch(console.error);
