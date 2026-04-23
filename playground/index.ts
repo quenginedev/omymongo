@@ -1,6 +1,6 @@
 /**
  * Playground Entry Point
- * Runs all examples sequentially.
+ * Lists the available examples and how to run them individually.
  *
  * Run: npx tsx playground/index.ts
  */
